@@ -51,7 +51,7 @@
 </div>
 <div class="field">
 <label for="su-branch">Branch</label>
-<select id="su-branch" required>
+<select id="su-branch">
 <option value="">Loading branches…</option>
 </select>
 </div>
@@ -113,10 +113,10 @@ async function loadBranches() {
   const select = document.getElementById('su-branch');
   const { data, error } = await sb.from('branches').select('id, name').order('sort_order');
   if (error || !data || data.length === 0) {
-    select.innerHTML = '<option value="">Branches aren\'t set up yet — check back soon</option>';
+    select.innerHTML = '<option value="">Branches aren\'t set up yet — you can register without one for now</option>';
     return;
   }
-  select.innerHTML = '<option value="">Choose your branch…</option>' +
+  select.innerHTML = '<option value="">No branch / not sure yet</option>' +
     data.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
 
   const preselect = new URLSearchParams(window.location.search).get('branch');
