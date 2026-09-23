@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raffles — Ōpanake 1C South 6B</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="header">
+<a href="index.html" class="logo">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V6"/><path d="M12 6c0-3 2.5-4.5 5-4.5-0.5 3-2.5 5-5 5"/><path d="M12 10c0-3 2.8-4.7 5.6-4.7-0.6 3.1-2.8 5.2-5.6 5.2"/><path d="M12 6c0-3-2.5-4.5-5-4.5 0.5 3 2.5 5 5 5"/><path d="M12 10c0-3-2.8-4.7-5.6-4.7 0.6 3.1 2.8 5.2 5.6 5.2"/></svg>
+Ōpanake 1C South 6B
+</a>
+<nav class="nav">
+<a href="index.html">Home</a>
+<a href="branches.html">Branches</a>
+<a href="whakapapa.html">Whakapapa</a>
+<a href="history.html">History</a>
+<a href="forum.html">Forum</a>
+<a href="archive.html">Archive</a>
+<a href="photos.html">Photos</a>
+<a href="shop.html">Shop</a>
+<a href="raffles.html" class="active">Raffles</a>
+<a href="register.html" class="pill" data-nav="login-pill">Register / Login</a>
+<a href="profile.html" class="avatar" data-nav="profile-icon">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+</a>
+</nav>
+</header>
+
+<main>
+<div class="hero" style="padding-bottom: 8px;">
+<div class="eyebrow">Raffles</div>
+<h1 style="font-size: 32px; margin-top: 8px;">Whānau raffles</h1>
+<p>Register interest in tickets and we'll follow up with an invoice — no payment on the site yet.</p>
+</div>
+
+<div class="container" style="padding-top: 12px; padding-bottom: 40px;">
+<div id="raffle-list" style="display: flex; flex-direction: column; gap: 20px;">
+<div class="help-text">Loading raffles…</div>
+</div>
+</div>
+
+<div id="admin-section" class="container hidden" style="padding-bottom: 56px;">
+<h2 style="font-size: 20px;">Raffle admin</h2>
+<form id="add-raffle-form" class="card" style="margin-top: 16px;">
+<h3 style="font-size: 15px; margin: 0 0 14px;">Add a raffle</h3>
+<div class="field">
+<label for="nr-title">Title</label>
+<input id="nr-title" type="text" required>
+</div>
+<div class="field">
+<label for="nr-description">Description (optional)</label>
+<input id="nr-description" type="text">
+</div>
+<div class="field">
+<label for="nr-price">Ticket price (NZD)</label>
+<input id="nr-price" type="number" min="0" step="0.01" required>
+</div>
+<div class="field">
+<label for="nr-draw-date">Draw date (optional)</label>
+<input id="nr-draw-date" type="date">
+</div>
+<div id="nr-error" class="error-text hidden"></div>
+<button type="submit" id="nr-submit" class="btn">Add raffle</button>
+</form>
+</div>
+
+</main>
+
+<footer class="footer">© Ōpanake 1C South 6B whānau trust</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-client.js"></script>
+<script>
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+function money(cents) { return '$' + (cents / 100).toFixed(2); }
+function formatDate(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+let session = null;
+let isAdmin = false;
+
+const statusLabels = { open: 'Open', closed: 'Entries closed', drawn: 'Drawn' };
+
+async function renderRaffles() {
+  const { data: raffles, error } = await sb
+    .from('raffles')
+    .select('id, title, description, ticket_price_cents, draw_date, status, winner_name, created_at')
+    .order('created_at', { ascending: false });
+
+  const listEl = document.getElementById('raffle-list');
+  if (error || !raffles) {
+    listEl.innerHTML = '<p class="error-text">Could not load raffles right now.</p>';
+    return;
+  }
+  if (raffles.length === 0) {
+    listEl.innerHTML = '<p class="help-text">No raffles running at the moment.</p>';
+    return;
+  }
+
+  const { data: totals } = await sb.rpc('raffle_ticket_totals');
+  const totalsById = {};
+  (totals || []).forEach((t) => { totalsById[t.raffle_id] = t; });
+
+  let myEntries = {};
+  if (session) {
+    const { data: entries } = await sb.from('raffle_entries').select('raffle_id, quantity').eq('member_id', session.user.id);
+    (entries || []).forEach((e) => { myEntries[e.raffle_id] = (myEntries[e.raffle_id] || 0) + e.quantity; });
+  }
+
+  listEl.innerHTML = raffles.map((r) => {
+    const t = totalsById[r.id] || { total_tickets: 0, total_entrants: 0 };
+    const mine = myEntries[r.id] || 0;
+    return `
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+          <div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <h2 style="font-size:18px; margin:0;">${escapeHtml(r.title)}</h2>
+              <span class="badge ${r.status === 'drawn' ? 'badge-approved' : 'badge-pending'}">${statusLabels[r.status] || r.status}</span>
+            </div>
+            ${r.description ? `<p class="help-text" style="margin-top:6px;">${escapeHtml(r.description)}</p>` : ''}
+            <p class="help-text" style="margin-top:6px;">${money(r.ticket_price_cents)} per ticket${r.draw_date ? ' · drawn ' + formatDate(r.draw_date) : ''} · ${t.total_tickets || 0} ticket${(t.total_tickets || 0) === 1 ? '' : 's'} sold</p>
+            ${r.status === 'drawn' && r.winner_name ? `<p style="margin-top:8px; font-weight:600; color: var(--accent-dark);">Winner: ${escapeHtml(r.winner_name)}</p>` : ''}
+            ${mine > 0 ? `<p class="help-text" style="margin-top:6px;">You have ${mine} ticket${mine === 1 ? '' : 's'} in this raffle.</p>` : ''}
+          </div>
+          ${session && r.status === 'open' ? `
+            <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+              <input type="number" min="1" value="1" id="qty-${r.id}" style="width:64px; font:inherit; font-size:13px; padding:8px; border:1px solid var(--border); border-radius:6px; background:var(--bg);">
+              <button type="button" class="btn buy-tickets" data-raffle-id="${r.id}" data-price="${r.ticket_price_cents}">Get tickets</button>
+            </div>` : ''}
+        </div>
+        ${isAdmin ? `
+          <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:flex; gap:10px;">
+            ${r.status === 'open' ? `<button type="button" class="btn btn-outline close-raffle" data-raffle-id="${r.id}">Close entries</button>` : ''}
+            ${r.status === 'closed' ? `<button type="button" class="btn draw-raffle" data-raffle-id="${r.id}">Draw winner</button>` : ''}
+          </div>` : ''}
+      </div>`;
+  }).join('');
+
+  document.querySelectorAll('.buy-tickets').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const raffleId = btn.getAttribute('data-raffle-id');
+      const qtyInput = document.getElementById(`qty-${raffleId}`);
+      const qty = parseInt(qtyInput.value, 10) || 0;
+      if (qty < 1) return;
+      btn.disabled = true;
+      btn.textContent = 'Adding…';
+      const { error: insertError } = await sb.from('raffle_entries').insert({ raffle_id: raffleId, member_id: session.user.id, quantity: qty });
+      btn.disabled = false;
+      btn.textContent = 'Get tickets';
+      if (insertError) {
+        alert(insertError.message);
+        return;
+      }
+      await renderRaffles();
+    });
+  });
+
+  document.querySelectorAll('.close-raffle').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      await sb.from('raffles').update({ status: 'closed' }).eq('id', btn.getAttribute('data-raffle-id'));
+      await renderRaffles();
+    });
+  });
+
+  document.querySelectorAll('.draw-raffle').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const raffleId = btn.getAttribute('data-raffle-id');
+      if (!confirm('Draw a winner for this raffle now? This cannot be undone.')) return;
+      btn.disabled = true;
+      btn.textContent = 'Drawing…';
+
+      const { data: entries, error: entriesError } = await sb
+        .from('raffle_entries')
+        .select('id, member_id, quantity')
+        .eq('raffle_id', raffleId);
+
+      if (entriesError || !entries || entries.length === 0) {
+        alert('No entries to draw from.');
+        btn.disabled = false;
+        btn.textContent = 'Draw winner';
+        return;
+      }
+
+      const weighted = [];
+      entries.forEach((e) => { for (let i = 0; i < e.quantity; i++) weighted.push(e); });
+      const winnerEntry = weighted[Math.floor(Math.random() * weighted.length)];
+
+      const { data: profiles } = await sb.from('profiles').select('id, full_name');
+      const nameById = {};
+      (profiles || []).forEach((p) => { nameById[p.id] = p.full_name; });
+      const winnerName = nameById[winnerEntry.member_id] || 'Unknown member';
+
+      await sb.from('raffles').update({
+        status: 'drawn',
+        winner_entry_id: winnerEntry.id,
+        winner_name: winnerName
+      }).eq('id', raffleId);
+
+      btn.disabled = false;
+      await renderRaffles();
+    });
+  });
+}
+
+document.getElementById('add-raffle-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('nr-submit');
+  const errorEl = document.getElementById('nr-error');
+  errorEl.classList.add('hidden');
+
+  const title = document.getElementById('nr-title').value.trim();
+  const description = document.getElementById('nr-description').value.trim();
+  const priceNzd = parseFloat(document.getElementById('nr-price').value);
+  const drawDate = document.getElementById('nr-draw-date').value;
+
+  if (!title || isNaN(priceNzd)) {
+    errorEl.textContent = 'Add a title and a ticket price.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+
+  const { error } = await sb.from('raffles').insert({
+    title,
+    description: description || null,
+    ticket_price_cents: Math.round(priceNzd * 100),
+    draw_date: drawDate || null
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Add raffle';
+
+  if (error) {
+    errorEl.textContent = error.message;
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('add-raffle-form').reset();
+  await renderRaffles();
+});
+
+async function init() {
+  const { data: sessionData } = await sb.auth.getSession();
+  session = sessionData.session;
+
+  if (session) {
+    const { data } = await sb.from('profiles').select('role').eq('id', session.user.id).single();
+    isAdmin = !!(data && data.role === 'admin');
+    if (isAdmin) document.getElementById('admin-section').classList.remove('hidden');
+  }
+
+  await renderRaffles();
+}
+
+init();
+</script>
+</body>
+</html>
