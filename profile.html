@@ -63,6 +63,14 @@
 </div>
 </div>
 
+<div id="admin-members" class="hidden" style="margin-top: 32px;">
+<h2 style="font-size: 19px;">All members</h2>
+<p class="help-text" style="margin-top: 4px;">Set or change anyone's branch here — including anyone who signed up as "not sure".</p>
+<div id="members-list" style="display: flex; flex-direction: column; gap: 12px; margin-top: 14px;">
+<div class="help-text">Loading…</div>
+</div>
+</div>
+
 </div>
 </main>
 
@@ -193,13 +201,70 @@ async function renderPending() {
   });
 }
 
+async function renderMembers() {
+  const { data: members, error } = await sb
+    .from('profiles')
+    .select('id, full_name, branch_id, joined_at')
+    .eq('status', 'approved')
+    .order('full_name');
+
+  const listEl = document.getElementById('members-list');
+
+  if (error) {
+    listEl.innerHTML = '<p class="error-text">Could not load members.</p>';
+    return;
+  }
+  if (!members || members.length === 0) {
+    listEl.innerHTML = '<p class="help-text">No approved members yet.</p>';
+    return;
+  }
+
+  const branchOptions = '<option value="">No branch set</option>' +
+    allBranches.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+
+  listEl.innerHTML = members.map((m) => `
+    <div class="card" style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;">
+      <div style="font-weight:600; font-size:14.5px;">${escapeHtml(m.full_name || 'Unnamed member')}</div>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <span data-member-saved="${m.id}" class="help-text hidden" style="color: var(--accent-dark);">Saved</span>
+        <select data-member-branch="${m.id}" style="font:inherit; font-size:13px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg);">${branchOptions}</select>
+      </div>
+    </div>`).join('');
+
+  members.forEach((m) => {
+    const select = document.querySelector(`[data-member-branch="${m.id}"]`);
+    if (select && m.branch_id) select.value = m.branch_id;
+  });
+
+  document.querySelectorAll('[data-member-branch]').forEach((select) => {
+    select.addEventListener('change', async () => {
+      const id = select.getAttribute('data-member-branch');
+      const branchId = select.value || null;
+      select.disabled = true;
+      const { error: updateError } = await sb.from('profiles').update({ branch_id: branchId }).eq('id', id);
+      select.disabled = false;
+      if (updateError) {
+        alert("Couldn't save that — " + updateError.message);
+        return;
+      }
+      const savedEl = document.querySelector(`[data-member-saved="${id}"]`);
+      if (savedEl) {
+        savedEl.classList.remove('hidden');
+        setTimeout(() => savedEl.classList.add('hidden'), 1500);
+      }
+    });
+  });
+}
+
 async function initAdmin(userId) {
   const { data } = await sb.from('profiles').select('role').eq('id', userId).single();
   if (data && data.role === 'admin') {
     const { data: branches } = await sb.from('branches').select('id, name').order('sort_order');
     allBranches = branches || [];
     document.getElementById('admin-approvals').classList.remove('hidden');
+    document.getElementById('admin-members').classList.remove('hidden');
     await renderPending();
+    await renderMembers();
   }
 }
 
