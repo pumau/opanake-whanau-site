@@ -37,11 +37,15 @@
 <p>Shared documents for the whānau trust — visible to signed-in, approved members.</p>
 </div>
 
-<div class="container" style="padding-top: 12px; padding-bottom: 56px;">
-
-<div id="gated" class="card card-muted hidden" style="margin-bottom: 24px; text-align: center;">
-<p style="margin: 0;">The archive is visible to signed-in, approved members. <a href="register.html" style="color: var(--accent-dark); font-weight: 600;">Register or log in</a>.</p>
+<div id="access-gate" class="container hidden" style="padding-top: 12px; padding-bottom: 56px;">
+<div class="card" style="max-width: 520px; margin: 0 auto; text-align:center;">
+<h2 id="access-gate-title" style="font-size:19px;">—</h2>
+<p id="access-gate-text" style="margin-top:10px;"></p>
+<a id="access-gate-btn" href="register.html" class="btn" style="margin-top:14px; display:inline-flex;">Register / log in</a>
 </div>
+</div>
+
+<div id="page-content" class="hidden container" style="padding-top: 12px; padding-bottom: 56px;">
 
 <div id="admin-upload" class="card hidden" style="margin-bottom: 24px;">
 <h2 style="font-size: 16px; margin: 0 0 16px;">Upload a document</h2>
@@ -104,8 +108,7 @@ async function renderFiles() {
   const listEl = document.getElementById('file-list');
 
   if (error || !files) {
-    document.getElementById('gated').classList.remove('hidden');
-    listEl.innerHTML = '';
+    listEl.innerHTML = '<p class="error-text">Could not load the archive right now.</p>';
     return;
   }
 
@@ -138,11 +141,11 @@ async function renderFiles() {
 }
 
 async function init() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) {
-    isAdmin = await checkAdmin(session.user.id);
-    if (isAdmin) document.getElementById('admin-upload').classList.remove('hidden');
-  }
+  const status = await initAccessGate();
+  if (!status.approved) return;
+  document.getElementById('page-content').classList.remove('hidden');
+  isAdmin = status.isAdmin;
+  if (isAdmin) document.getElementById('admin-upload').classList.remove('hidden');
   await renderFiles();
 }
 

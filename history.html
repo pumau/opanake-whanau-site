@@ -31,6 +31,16 @@
 </header>
 
 <main>
+
+<div id="access-gate" class="container hidden" style="padding: 40px 56px 56px;">
+<div class="card" style="max-width: 520px; margin: 0 auto; text-align:center;">
+<h2 id="access-gate-title" style="font-size:19px;">—</h2>
+<p id="access-gate-text" style="margin-top:10px;"></p>
+<a id="access-gate-btn" href="register.html" class="btn" style="margin-top:14px; display:inline-flex;">Register / log in</a>
+</div>
+</div>
+
+<div id="page-content" class="hidden">
 <div class="hero" style="text-align: center; padding-bottom: 8px;">
 <div class="eyebrow">Our history</div>
 <h1 style="font-size: 34px; margin-top: 8px; max-width: 720px; margin-left: auto; margin-right: auto;">The story of our whenua and our whānau</h1>
@@ -73,11 +83,19 @@
 <p style="margin: 0; font-size: 13.5px;">This timeline is just getting started. If you've got dates, stories or milestones from any branch, get in touch so we can add them here.</p>
 </div>
 </div>
+</div>
 </main>
 
 <footer class="footer">© Ōpanake 1C South 6B whānau trust</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supabase-client.js"></script>
+<script>
+async function init() {
+  const status = await initAccessGate();
+  if (status.approved) document.getElementById('page-content').classList.remove('hidden');
+}
+init();
+</script>
 </body>
 </html>

@@ -130,10 +130,12 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+let allBranches = [];
+
 async function renderPending() {
   const { data: pending, error } = await sb
     .from('profiles')
-    .select('id, full_name, joined_at, branches(name)')
+    .select('id, full_name, branch_id, joined_at, branches(name)')
     .eq('status', 'pending')
     .order('joined_at');
 
@@ -148,22 +150,34 @@ async function renderPending() {
     return;
   }
 
+  const branchOptions = '<option value="">No branch set</option>' +
+    allBranches.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+
   listEl.innerHTML = pending.map((p) => `
     <div class="card" style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;">
       <div>
         <div style="font-weight:600; font-size:14.5px;">${escapeHtml(p.full_name || 'Unnamed member')}</div>
         <div class="help-text" style="margin-top:2px;">${escapeHtml((p.branches && p.branches.name) || 'No branch set')} · registered ${formatDate(p.joined_at)}</div>
       </div>
-      <div style="display:flex; gap:8px;">
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <select data-branch-select="${p.id}" style="font:inherit; font-size:13px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg);">${branchOptions}</select>
         <button type="button" class="btn approve-btn" data-id="${p.id}">Approve</button>
         <button type="button" class="btn btn-outline reject-btn" data-id="${p.id}">Reject</button>
       </div>
     </div>`).join('');
 
+  pending.forEach((p) => {
+    const select = document.querySelector(`[data-branch-select="${p.id}"]`);
+    if (select && p.branch_id) select.value = p.branch_id;
+  });
+
   document.querySelectorAll('.approve-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
       btn.disabled = true;
-      await sb.from('profiles').update({ status: 'approved' }).eq('id', btn.getAttribute('data-id'));
+      const id = btn.getAttribute('data-id');
+      const select = document.querySelector(`[data-branch-select="${id}"]`);
+      const branchId = select && select.value ? select.value : null;
+      await sb.from('profiles').update({ status: 'approved', branch_id: branchId }).eq('id', id);
       await renderPending();
     });
   });
@@ -180,6 +194,8 @@ async function renderPending() {
 async function initAdmin(userId) {
   const { data } = await sb.from('profiles').select('role').eq('id', userId).single();
   if (data && data.role === 'admin') {
+    const { data: branches } = await sb.from('branches').select('id, name').order('sort_order');
+    allBranches = branches || [];
     document.getElementById('admin-approvals').classList.remove('hidden');
     await renderPending();
   }

@@ -35,7 +35,15 @@
 <a href="branches.html" style="color: var(--accent-dark); font-weight: 600; font-size: 13px;">← The 9 branches</a>
 </div>
 
-<div id="loading" class="container" style="padding: 20px 56px;">
+<div id="access-gate" class="container hidden" style="padding: 20px 56px 56px;">
+<div class="card" style="max-width: 520px; margin: 0 auto; text-align:center;">
+<h2 id="access-gate-title" style="font-size:19px;">—</h2>
+<p id="access-gate-text" style="margin-top:10px;"></p>
+<a id="access-gate-btn" href="register.html" class="btn" style="margin-top:14px; display:inline-flex;">Register / log in</a>
+</div>
+</div>
+
+<div id="loading" class="container hidden" style="padding: 20px 56px;">
 <p class="help-text">Loading…</p>
 </div>
 
@@ -141,7 +149,14 @@ async function loadBranch() {
   content.classList.remove('hidden');
 }
 
-loadBranch();
+async function init() {
+  const status = await initAccessGate();
+  if (!status.approved) return;
+  document.getElementById('loading').classList.remove('hidden');
+  await loadBranch();
+}
+
+init();
 </script>
 </body>
 </html>

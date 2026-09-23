@@ -37,13 +37,17 @@
 <p>Discussion, questions and updates across all nine branches.</p>
 </div>
 
-<div class="container" style="padding-top: 12px; padding-bottom: 56px;">
-
-<div id="new-topic-gate" class="card card-muted hidden" style="margin-bottom: 24px; text-align: center;">
-<p style="margin: 0;">Sign in as an approved member to start a new topic. <a href="register.html" style="color: var(--accent-dark); font-weight: 600;">Register or log in</a>.</p>
+<div id="access-gate" class="container hidden" style="padding-top: 12px; padding-bottom: 56px;">
+<div class="card" style="max-width: 520px; margin: 0 auto; text-align:center;">
+<h2 id="access-gate-title" style="font-size:19px;">—</h2>
+<p id="access-gate-text" style="margin-top:10px;"></p>
+<a id="access-gate-btn" href="register.html" class="btn" style="margin-top:14px; display:inline-flex;">Register / log in</a>
+</div>
 </div>
 
-<form id="new-topic-form" class="card hidden" style="margin-bottom: 24px;">
+<div id="page-content" class="hidden container" style="padding-top: 12px; padding-bottom: 56px;">
+
+<form id="new-topic-form" class="card" style="margin-bottom: 24px;">
 <h2 style="font-size: 17px; margin: 0 0 16px;">Start a new topic</h2>
 <div class="field">
 <label for="nt-category">Category</label>
@@ -88,10 +92,7 @@ let session = null;
 let nameById = {};
 
 async function loadForum() {
-  const { data: sessionData } = await sb.auth.getSession();
-  session = sessionData.session;
-
-  const { data: directory } = session ? await sb.rpc('list_member_directory') : { data: null };
+  const { data: directory } = await sb.rpc('list_member_directory');
   if (directory) directory.forEach((m) => { nameById[m.id] = m.full_name; });
 
   const { data: categories, error: catError } = await sb
@@ -139,13 +140,8 @@ async function loadForum() {
       </div>`;
   }).join('');
 
-  if (session) {
-    document.getElementById('new-topic-form').classList.remove('hidden');
-    const select = document.getElementById('nt-category');
-    select.innerHTML = categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-  } else {
-    document.getElementById('new-topic-gate').classList.remove('hidden');
-  }
+  const select = document.getElementById('nt-category');
+  select.innerHTML = categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
 }
 
 document.getElementById('new-topic-form').addEventListener('submit', async (e) => {
@@ -189,7 +185,15 @@ document.getElementById('new-topic-form').addEventListener('submit', async (e) =
   window.location.href = `topic.html?id=${encodeURIComponent(topic.id)}`;
 });
 
-loadForum();
+async function init() {
+  const status = await initAccessGate();
+  if (!status.approved) return;
+  session = status.session;
+  document.getElementById('page-content').classList.remove('hidden');
+  await loadForum();
+}
+
+init();
 </script>
 </body>
 </html>

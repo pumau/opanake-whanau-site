@@ -32,19 +32,28 @@
 </header>
 
 <main>
+
+<div id="access-gate" class="hero hidden">
+<div class="eyebrow">Private whānau site</div>
+<h1 id="access-gate-title" style="font-size: 34px; margin-top: 10px;">Members only</h1>
+<p id="access-gate-text">This site is for registered, approved whānau members only. Register or log in to continue.</p>
+<div style="display:flex; gap:16px; align-items:center; margin-top:18px; flex-wrap:wrap;">
+<a id="access-gate-btn" href="register.html" class="btn">Register / log in</a>
+</div>
+</div>
+
+<div id="page-content" class="hidden">
 <div class="hero">
 <div class="eyebrow">Whānau · Whenua · Whakapapa</div>
 <h1 style="font-size: 44px; margin-top: 10px; line-height: 1.15;">A home for the descendants of Irihapeti Patuawa</h1>
 <p>Ōpanake 1C South 6B is our shared whenua at Mamaranui, Kaihu. This site is bringing the nine sibling branches together in one place — for hui, whakapapa, the archive, and each other.</p>
-<div style="display:flex; gap:16px; align-items:center; margin-top:18px; flex-wrap:wrap;">
-<a href="register.html" class="btn">Register your branch</a>
-</div>
 </div>
 
 <div class="container" style="padding-top: 24px; padding-bottom: 56px;">
 <div class="card">
 <h2 style="font-size: 18px;">This site is just getting started</h2>
-<p style="margin: 10px 0 0;">We're building this out branch by branch. Registering now means you'll be one of the first members, and an admin will approve your account so you can see the forum, the archive and the rest of the members' area as it goes live.</p>
+<p style="margin: 10px 0 0;">We're building this out branch by branch. Head to the forum, archive, whakapapa and the rest of the members' area from the menu above.</p>
+</div>
 </div>
 </div>
 </main>
@@ -53,5 +62,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supabase-client.js"></script>
+<script>
+async function init() {
+  const status = await initAccessGate();
+  if (status.approved) document.getElementById('page-content').classList.remove('hidden');
+}
+init();
+</script>
 </body>
 </html>

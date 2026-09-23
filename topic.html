@@ -35,7 +35,15 @@
 <a href="forum.html" style="color: var(--accent-dark); font-weight: 600; font-size: 13px;">← Forum</a>
 </div>
 
-<div id="loading" class="container" style="padding: 20px 56px;">
+<div id="access-gate" class="container hidden" style="padding: 20px 56px 56px;">
+<div class="card" style="max-width: 520px; margin: 0 auto; text-align:center;">
+<h2 id="access-gate-title" style="font-size:19px;">—</h2>
+<p id="access-gate-text" style="margin-top:10px;"></p>
+<a id="access-gate-btn" href="register.html" class="btn" style="margin-top:14px; display:inline-flex;">Register / log in</a>
+</div>
+</div>
+
+<div id="loading" class="container hidden" style="padding: 20px 56px;">
 <p class="help-text">Loading…</p>
 </div>
 
@@ -50,7 +58,7 @@
 <h1 id="topic-title" style="font-size: 28px;">—</h1>
 <div id="post-list" style="display: flex; flex-direction: column; gap: 16px; margin-top: 20px;"></div>
 
-<form id="reply-form" class="card hidden" style="margin-top: 24px;">
+<form id="reply-form" class="card" style="margin-top: 24px;">
 <h2 style="font-size: 16px; margin: 0 0 14px;">Reply</h2>
 <div class="field">
 <textarea id="reply-body" required rows="4" style="font: inherit; font-size: 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); resize: vertical;"></textarea>
@@ -58,10 +66,6 @@
 <div id="reply-error" class="error-text hidden"></div>
 <button type="submit" id="reply-submit" class="btn">Post reply</button>
 </form>
-
-<div id="reply-gate" class="card card-muted hidden" style="margin-top: 24px; text-align: center;">
-<p style="margin: 0;">Sign in as an approved member to reply. <a href="register.html" style="color: var(--accent-dark); font-weight: 600;">Register or log in</a>.</p>
-</div>
 </div>
 </main>
 
@@ -96,9 +100,6 @@ async function loadTopic() {
     return;
   }
 
-  const { data: sessionData } = await sb.auth.getSession();
-  session = sessionData.session;
-
   const { data: topic, error: topicError } = await sb
     .from('forum_topics')
     .select('id, title, author_id, created_at')
@@ -117,7 +118,7 @@ async function loadTopic() {
     .eq('topic_id', topicId)
     .order('created_at');
 
-  const { data: directory } = session ? await sb.rpc('list_member_directory') : { data: null };
+  const { data: directory } = await sb.rpc('list_member_directory');
   const nameById = {};
   if (directory) directory.forEach((m) => { nameById[m.id] = m.full_name; });
 
@@ -130,12 +131,6 @@ async function loadTopic() {
       </div>
       <p style="margin:0; font-size:14.5px; line-height:1.6; white-space: pre-wrap;">${escapeHtml(p.body)}</p>
     </div>`).join('');
-
-  if (session) {
-    document.getElementById('reply-form').classList.remove('hidden');
-  } else {
-    document.getElementById('reply-gate').classList.remove('hidden');
-  }
 
   loading.classList.add('hidden');
   content.classList.remove('hidden');
@@ -164,7 +159,15 @@ document.getElementById('reply-form').addEventListener('submit', async (e) => {
   window.location.reload();
 });
 
-loadTopic();
+async function init() {
+  const status = await initAccessGate();
+  if (!status.approved) return;
+  session = status.session;
+  document.getElementById('loading').classList.remove('hidden');
+  await loadTopic();
+}
+
+init();
 </script>
 </body>
 </html>

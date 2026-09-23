@@ -37,11 +37,16 @@
 <p>Place an order and we'll follow up with an invoice — no payment on the site yet.</p>
 </div>
 
-<div class="container" style="padding-top: 12px; padding-bottom: 40px;">
-
-<div id="order-gate" class="card card-muted hidden" style="margin-bottom: 24px; text-align: center;">
-<p style="margin: 0;">Sign in as an approved member to place an order. <a href="register.html" style="color: var(--accent-dark); font-weight: 600;">Register or log in</a>.</p>
+<div id="access-gate" class="container hidden" style="padding-top: 12px; padding-bottom: 56px;">
+<div class="card" style="max-width: 520px; margin: 0 auto; text-align:center;">
+<h2 id="access-gate-title" style="font-size:19px;">—</h2>
+<p id="access-gate-text" style="margin-top:10px;"></p>
+<a id="access-gate-btn" href="register.html" class="btn" style="margin-top:14px; display:inline-flex;">Register / log in</a>
 </div>
+</div>
+
+<div id="page-content" class="hidden">
+<div class="container" style="padding-top: 12px; padding-bottom: 40px;">
 
 <div id="order-success" class="card hidden" style="margin-bottom: 24px; background: var(--river-soft); border: 1px solid var(--river);">
 <p style="margin: 0;">Thanks — your order's in. We'll be in touch with an invoice.</p>
@@ -92,6 +97,7 @@
 </div>
 </div>
 
+</div>
 </main>
 
 <footer class="footer">© Ōpanake 1C South 6B whānau trust</footer>
@@ -150,15 +156,11 @@ async function loadProducts() {
       </div>`;
   }).join('');
 
-  if (session) {
-    document.getElementById('order-footer').classList.remove('hidden');
-    document.querySelectorAll('.qty-input').forEach((input) => {
-      input.addEventListener('input', updateTotal);
-    });
-    updateTotal();
-  } else {
-    document.getElementById('order-gate').classList.remove('hidden');
-  }
+  document.getElementById('order-footer').classList.remove('hidden');
+  document.querySelectorAll('.qty-input').forEach((input) => {
+    input.addEventListener('input', updateTotal);
+  });
+  updateTotal();
 }
 
 function updateTotal() {
@@ -320,13 +322,11 @@ async function loadOrders() {
 }
 
 async function init() {
-  const { data: sessionData } = await sb.auth.getSession();
-  session = sessionData.session;
-
-  if (session) {
-    const { data } = await sb.from('profiles').select('role').eq('id', session.user.id).single();
-    isAdmin = !!(data && data.role === 'admin');
-  }
+  const status = await initAccessGate();
+  if (!status.approved) return;
+  session = status.session;
+  isAdmin = status.isAdmin;
+  document.getElementById('page-content').classList.remove('hidden');
 
   await loadProducts();
 

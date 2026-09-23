@@ -37,6 +37,15 @@
 <p>Register interest in tickets and we'll follow up with an invoice — no payment on the site yet.</p>
 </div>
 
+<div id="access-gate" class="container hidden" style="padding-top: 12px; padding-bottom: 56px;">
+<div class="card" style="max-width: 520px; margin: 0 auto; text-align:center;">
+<h2 id="access-gate-title" style="font-size:19px;">—</h2>
+<p id="access-gate-text" style="margin-top:10px;"></p>
+<a id="access-gate-btn" href="register.html" class="btn" style="margin-top:14px; display:inline-flex;">Register / log in</a>
+</div>
+</div>
+
+<div id="page-content" class="hidden">
 <div class="container" style="padding-top: 12px; padding-bottom: 40px;">
 <div id="raffle-list" style="display: flex; flex-direction: column; gap: 20px;">
 <div class="help-text">Loading raffles…</div>
@@ -68,6 +77,7 @@
 </form>
 </div>
 
+</div>
 </main>
 
 <footer class="footer">© Ōpanake 1C South 6B whānau trust</footer>
@@ -254,14 +264,12 @@ document.getElementById('add-raffle-form').addEventListener('submit', async (e) 
 });
 
 async function init() {
-  const { data: sessionData } = await sb.auth.getSession();
-  session = sessionData.session;
-
-  if (session) {
-    const { data } = await sb.from('profiles').select('role').eq('id', session.user.id).single();
-    isAdmin = !!(data && data.role === 'admin');
-    if (isAdmin) document.getElementById('admin-section').classList.remove('hidden');
-  }
+  const status = await initAccessGate();
+  if (!status.approved) return;
+  session = status.session;
+  isAdmin = status.isAdmin;
+  document.getElementById('page-content').classList.remove('hidden');
+  if (isAdmin) document.getElementById('admin-section').classList.remove('hidden');
 
   await renderRaffles();
 }

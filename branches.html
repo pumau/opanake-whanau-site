@@ -37,7 +37,15 @@
 <p>Every descendant of Irihapeti Patuawa belongs to one of nine sibling lines. Find your branch below, and see who else has registered.</p>
 </div>
 
-<div class="container" style="padding-top: 12px; padding-bottom: 56px;">
+<div id="access-gate" class="container hidden" style="padding-top: 12px; padding-bottom: 56px;">
+<div class="card" style="max-width: 520px; margin: 0 auto; text-align:center;">
+<h2 id="access-gate-title" style="font-size:19px;">—</h2>
+<p id="access-gate-text" style="margin-top:10px;"></p>
+<a id="access-gate-btn" href="register.html" class="btn" style="margin-top:14px; display:inline-flex;">Register / log in</a>
+</div>
+</div>
+
+<div id="page-content" class="container hidden" style="padding-top: 12px; padding-bottom: 56px;">
 
 <div id="admin-hint" class="card card-muted hidden" style="margin-bottom: 20px; font-size: 13.5px;">
 You're an admin, so you can rename branches below. Click a name to edit it.
@@ -63,13 +71,6 @@ function escapeHtml(s) {
 
 let isAdmin = false;
 
-async function checkAdmin() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) return false;
-  const { data } = await sb.from('profiles').select('role').eq('id', session.user.id).single();
-  return !!(data && data.role === 'admin');
-}
-
 async function loadBranches() {
   const grid = document.getElementById('branch-grid');
 
@@ -83,8 +84,6 @@ async function loadBranches() {
     return;
   }
 
-  // Member counts — only resolves for signed-in approved members; for
-  // anyone else this quietly comes back empty and we just skip counts.
   let counts = {};
   const { data: directory } = await sb.rpc('list_member_directory');
   if (directory) {
@@ -93,7 +92,6 @@ async function loadBranches() {
     });
   }
 
-  isAdmin = await checkAdmin();
   if (isAdmin) document.getElementById('admin-hint').classList.remove('hidden');
 
   grid.innerHTML = '';
@@ -152,7 +150,15 @@ async function loadBranches() {
   }
 }
 
-loadBranches();
+async function init() {
+  const status = await initAccessGate();
+  if (!status.approved) return;
+  isAdmin = status.isAdmin;
+  document.getElementById('page-content').classList.remove('hidden');
+  await loadBranches();
+}
+
+init();
 </script>
 </body>
 </html>

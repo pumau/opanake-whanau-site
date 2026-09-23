@@ -37,13 +37,17 @@
 <p>Shared by branch — visible to signed-in, approved members.</p>
 </div>
 
-<div class="container" style="padding-top: 12px; padding-bottom: 56px;">
-
-<div id="gated" class="card card-muted hidden" style="margin-bottom: 24px; text-align: center;">
-<p style="margin: 0;">Photos are visible to signed-in, approved members. <a href="register.html" style="color: var(--accent-dark); font-weight: 600;">Register or log in</a>.</p>
+<div id="access-gate" class="container hidden" style="padding-top: 12px; padding-bottom: 56px;">
+<div class="card" style="max-width: 520px; margin: 0 auto; text-align:center;">
+<h2 id="access-gate-title" style="font-size:19px;">—</h2>
+<p id="access-gate-text" style="margin-top:10px;"></p>
+<a id="access-gate-btn" href="register.html" class="btn" style="margin-top:14px; display:inline-flex;">Register / log in</a>
+</div>
 </div>
 
-<form id="upload-form" class="card hidden" style="margin-bottom: 24px;">
+<div id="page-content" class="hidden container" style="padding-top: 12px; padding-bottom: 56px;">
+
+<form id="upload-form" class="card" style="margin-bottom: 24px;">
 <h2 style="font-size: 16px; margin: 0 0 16px;">Add a photo</h2>
 <div class="field">
 <label for="ph-file">Photo</label>
@@ -95,8 +99,7 @@ async function renderGallery() {
   const gallery = document.getElementById('gallery');
 
   if (error || !photos) {
-    document.getElementById('gated').classList.remove('hidden');
-    gallery.innerHTML = '';
+    gallery.innerHTML = '<p class="error-text">Could not load photos right now.</p>';
     return;
   }
 
@@ -123,17 +126,16 @@ async function renderGallery() {
 }
 
 async function init() {
-  const { data: sessionData } = await sb.auth.getSession();
-  session = sessionData.session;
+  const status = await initAccessGate();
+  if (!status.approved) return;
+  session = status.session;
+  document.getElementById('page-content').classList.remove('hidden');
 
   const { data: branches } = await sb.from('branches').select('id, name, sort_order').order('sort_order');
   (branches || []).forEach((b) => { branchNameById[b.id] = b.name; });
 
-  if (session) {
-    const branchSelect = document.getElementById('ph-branch');
-    branchSelect.innerHTML = (branches || []).map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
-    document.getElementById('upload-form').classList.remove('hidden');
-  }
+  const branchSelect = document.getElementById('ph-branch');
+  branchSelect.innerHTML = (branches || []).map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
 
   await renderGallery();
 }

@@ -31,13 +31,20 @@
 </header>
 
 <main>
+
+<div id="access-gate" class="container hidden" style="padding: 40px 56px 56px;">
+<div class="card" style="max-width: 520px; margin: 0 auto; text-align:center;">
+<h2 id="access-gate-title" style="font-size:19px;">—</h2>
+<p id="access-gate-text" style="margin-top:10px;"></p>
+<a id="access-gate-btn" href="register.html" class="btn" style="margin-top:14px; display:inline-flex;">Register / log in</a>
+</div>
+</div>
+
+<div id="page-content" class="hidden">
 <div class="hero" style="text-align: center; padding-bottom: 8px;">
 <div class="eyebrow">Whakapapa</div>
 <h1 style="font-size: 32px; margin-top: 8px; max-width: 680px; margin-left: auto; margin-right: auto;">See how we're all connected</h1>
 <p style="margin-left: auto; margin-right: auto;">Every branch traces back to Irihapeti Patuawa. Follow the lines down to find your branch, or browse other registered whānau below.</p>
-<div id="members-only-badge" class="hidden" style="display: inline-flex; align-items: center; gap: 8px; background: var(--accent-2-soft); color: #7A4E18; padding: 8px 16px; border-radius: 999px; font-size: 12.5px; font-weight: 600; margin-top: 14px;">
-Members only — log in to view the full whānau directory
-</div>
 </div>
 
 <div class="container" style="padding: 32px 56px 8px; display: flex; justify-content: center;">
@@ -74,12 +81,9 @@ Members only — log in to view the full whānau directory
 </div>
 </div>
 
-<div id="directory-gated" class="card card-muted hidden" style="text-align: center;">
-<p style="margin: 0;">The whānau directory is visible to signed-in, approved members. <a href="register.html" style="color: var(--accent-dark); font-weight: 600;">Register or log in</a> to see it.</p>
-</div>
-
 <div id="directory-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px;"></div>
 <p id="directory-count" class="help-text" style="margin-top: 14px; text-align: center;"></p>
+</div>
 </div>
 </div>
 </main>
@@ -139,7 +143,7 @@ async function loadWhakapapa() {
   const { data: branches } = await sb.from('branches').select('id, name, sort_order').order('sort_order');
   allBranches = branches || [];
 
-  const { data: directory, error: dirError } = await sb.rpc('list_member_directory');
+  const { data: directory } = await sb.rpc('list_member_directory');
 
   const branchGrid = document.getElementById('branch-grid');
   let counts = {};
@@ -161,19 +165,20 @@ async function loadWhakapapa() {
     branchSelect.appendChild(opt);
   });
 
-  if (dirError || !directory) {
-    document.getElementById('members-only-badge').classList.remove('hidden');
-    document.getElementById('directory-gated').classList.remove('hidden');
-    return;
-  }
-
-  allMembers = directory;
+  allMembers = directory || [];
   renderDirectory();
   document.getElementById('member-search').addEventListener('input', renderDirectory);
   document.getElementById('member-branch-filter').addEventListener('change', renderDirectory);
 }
 
-loadWhakapapa();
+async function init() {
+  const status = await initAccessGate();
+  if (!status.approved) return;
+  document.getElementById('page-content').classList.remove('hidden');
+  await loadWhakapapa();
+}
+
+init();
 </script>
 </body>
 </html>
