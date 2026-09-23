@@ -84,6 +84,19 @@
 </div>
 <div id="login-error" class="error-text hidden"></div>
 <button type="submit" id="login-btn" class="btn btn-dark">Log in</button>
+<p class="help-text" style="margin-top: 14px;"><a href="#" id="forgot-password-link" style="color: var(--accent-dark); font-weight: 600;">Forgot your password?</a></p>
+</form>
+
+<form id="forgot-form" class="card hidden">
+<div class="field">
+<label for="fp-email">Email</label>
+<input id="fp-email" type="email" required autocomplete="email">
+<span class="help-text">We'll send a link to set a new password.</span>
+</div>
+<div id="forgot-error" class="error-text hidden"></div>
+<div id="forgot-success" class="hidden" style="background: var(--river-soft); border: 1px solid var(--river); border-radius: 10px; padding: 14px 16px; font-size: 13.5px; margin-bottom: 16px;"></div>
+<button type="submit" id="forgot-btn" class="btn btn-dark">Send reset link</button>
+<p class="help-text" style="margin-top: 14px;"><a href="#" id="back-to-login-link" style="color: var(--accent-dark); font-weight: 600;">Back to log in</a></p>
 </form>
 
 </div>
@@ -98,18 +111,34 @@ const tabSignup = document.getElementById('tab-signup');
 const tabLogin = document.getElementById('tab-login');
 const signupForm = document.getElementById('signup-form');
 const loginForm = document.getElementById('login-form');
+const forgotForm = document.getElementById('forgot-form');
+const forgotPasswordLink = document.getElementById('forgot-password-link');
+const backToLoginLink = document.getElementById('back-to-login-link');
 
 tabSignup.addEventListener('click', () => {
   tabSignup.classList.add('active');
   tabLogin.classList.remove('active');
   signupForm.classList.remove('hidden');
   loginForm.classList.add('hidden');
+  forgotForm.classList.add('hidden');
 });
 tabLogin.addEventListener('click', () => {
   tabLogin.classList.add('active');
   tabSignup.classList.remove('active');
   loginForm.classList.remove('hidden');
   signupForm.classList.add('hidden');
+  forgotForm.classList.add('hidden');
+});
+
+forgotPasswordLink.addEventListener('click', (e) => {
+  e.preventDefault();
+  loginForm.classList.add('hidden');
+  forgotForm.classList.remove('hidden');
+});
+backToLoginLink.addEventListener('click', (e) => {
+  e.preventDefault();
+  forgotForm.classList.add('hidden');
+  loginForm.classList.remove('hidden');
 });
 
 function escapeHtml(s) {
@@ -202,6 +231,36 @@ loginForm.addEventListener('submit', async (e) => {
     return;
   }
   window.location.href = 'profile.html';
+});
+
+forgotForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('forgot-btn');
+  const errorEl = document.getElementById('forgot-error');
+  const successEl = document.getElementById('forgot-success');
+  errorEl.classList.add('hidden');
+  successEl.classList.add('hidden');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+
+  const email = document.getElementById('fp-email').value.trim();
+
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/reset-password.html'
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Send reset link';
+
+  if (error) {
+    errorEl.textContent = error.message;
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  forgotForm.reset();
+  successEl.textContent = "If that email's registered, a reset link is on its way — check your inbox (and spam folder). It's valid for a little while, so use it soon.";
+  successEl.classList.remove('hidden');
 });
 
 loadBranches();
