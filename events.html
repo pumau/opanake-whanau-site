@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Events — Ōpanake 1C South 6B</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="header">
+<a href="index.html" class="logo">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V6"/><path d="M12 6c0-3 2.5-4.5 5-4.5-0.5 3-2.5 5-5 5"/><path d="M12 10c0-3 2.8-4.7 5.6-4.7-0.6 3.1-2.8 5.2-5.6 5.2"/><path d="M12 6c0-3-2.5-4.5-5-4.5 0.5 3 2.5 5 5 5"/><path d="M12 10c0-3-2.8-4.7-5.6-4.7 0.6 3.1 2.8 5.2 5.6 5.2"/></svg>
+Ōpanake 1C South 6B
+</a>
+<nav class="nav">
+<a href="index.html">Home</a>
+<a href="branches.html">Branches</a>
+<a href="whakapapa.html">Whakapapa</a>
+<a href="history.html">History</a>
+<a href="events.html" class="active">Events</a>
+<a href="meetings.html">Meetings</a>
+<a href="forum.html">Forum</a>
+<a href="archive.html">Archive</a>
+<a href="photos.html">Photos</a>
+<a href="shop.html">Shop</a>
+<a href="raffles.html">Raffles</a>
+<a href="register.html" class="pill" data-nav="login-pill">Register / Login</a>
+<a href="profile.html" class="avatar" data-nav="profile-icon">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+</a>
+</nav>
+</header>
+
+<main>
+
+<div id="access-gate" class="container hidden" style="padding-top: 40px; padding-bottom: 56px;">
+<div class="card" style="max-width: 520px; margin: 0 auto; text-align:center;">
+<h2 id="access-gate-title" style="font-size:19px;">—</h2>
+<p id="access-gate-text" style="margin-top:10px;"></p>
+<a id="access-gate-btn" href="register.html" class="btn" style="margin-top:14px; display:inline-flex;">Register / log in</a>
+</div>
+</div>
+
+<div id="page-content" class="hidden">
+<div class="hero" style="padding-bottom: 8px;">
+<div class="eyebrow">Ngā huihuinga</div>
+<h1 style="font-size: 32px; margin-top: 8px;">Events &amp; meetings calendar</h1>
+<p>Hui, working bees, fundraisers and meetings — everything coming up for the whānau, in one place.</p>
+</div>
+
+<div class="container" style="padding-top: 12px; padding-bottom: 56px;">
+
+<div id="admin-add-event" class="card hidden" style="margin-bottom: 28px;">
+<h2 style="font-size: 16px; margin: 0 0 16px;">Add an event</h2>
+<form id="new-event-form">
+<div class="field">
+<label for="ne-title">Title</label>
+<input id="ne-title" type="text" required>
+</div>
+<div class="field">
+<label for="ne-date">Date</label>
+<input id="ne-date" type="date" required>
+</div>
+<div class="field">
+<label for="ne-time">Time (optional)</label>
+<input id="ne-time" type="text" placeholder="e.g. 10:00am">
+</div>
+<div class="field">
+<label for="ne-location">Location (optional)</label>
+<input id="ne-location" type="text">
+</div>
+<div class="field">
+<label for="ne-description">Description (optional)</label>
+<input id="ne-description" type="text">
+</div>
+<div id="ne-error" class="error-text hidden"></div>
+<button type="submit" id="ne-submit" class="btn">Add event</button>
+</form>
+</div>
+
+<h2 style="font-size: 20px; margin-bottom: 16px;">Upcoming</h2>
+<div id="upcoming-list" style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 40px;">
+<div class="help-text">Loading events…</div>
+</div>
+
+<h2 style="font-size: 20px; margin-bottom: 16px;">Past</h2>
+<div id="past-list" style="display: flex; flex-direction: column; gap: 14px;"></div>
+
+</div>
+</div>
+</main>
+
+<footer class="footer">© Ōpanake 1C South 6B whānau trust</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-client.js"></script>
+<script>
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+
+function formatDate(d) {
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+let isAdmin = false;
+
+function eventCard(ev) {
+  const isMeeting = ev.event_type === 'meeting';
+  return `
+    <div class="card" style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+      <div>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <span style="font-weight:600; font-size:15px;">${escapeHtml(ev.title)}</span>
+          ${isMeeting ? '<span class="badge badge-pending">Meeting</span>' : ''}
+        </div>
+        <div class="help-text" style="margin-top:4px;">${formatDate(ev.event_date)}${ev.event_time ? ' · ' + escapeHtml(ev.event_time) : ''}${ev.location ? ' · ' + escapeHtml(ev.location) : ''}</div>
+        ${ev.description ? `<p style="margin:8px 0 0; font-size:13.5px;">${escapeHtml(ev.description)}</p>` : ''}
+        ${isMeeting ? `<a href="meetings.html" style="font-size:12.5px; font-weight:600; color:var(--accent-dark); margin-top:8px; display:inline-block;">View agenda &amp; notes →</a>` : ''}
+      </div>
+      ${isAdmin ? `<button type="button" class="btn btn-outline delete-event" data-id="${ev.id}" style="flex-shrink:0;">Remove</button>` : ''}
+    </div>`;
+}
+
+async function renderEvents() {
+  const { data: events, error } = await sb
+    .from('events')
+    .select('id, title, description, location, event_date, event_time, event_type')
+    .order('event_date');
+
+  const upcomingEl = document.getElementById('upcoming-list');
+  const pastEl = document.getElementById('past-list');
+
+  if (error || !events) {
+    upcomingEl.innerHTML = '<p class="error-text">Could not load events right now.</p>';
+    pastEl.innerHTML = '';
+    return;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = events.filter((e) => e.event_date >= today);
+  const past = events.filter((e) => e.event_date < today).sort((a, b) => b.event_date.localeCompare(a.event_date));
+
+  upcomingEl.innerHTML = upcoming.length
+    ? upcoming.map(eventCard).join('')
+    : '<p class="help-text">Nothing on the calendar yet.</p>';
+
+  pastEl.innerHTML = past.length
+    ? past.map(eventCard).join('')
+    : '<p class="help-text">No past events recorded.</p>';
+
+  if (isAdmin) {
+    document.querySelectorAll('.delete-event').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Remove this from the calendar?')) return;
+        await sb.from('events').delete().eq('id', btn.getAttribute('data-id'));
+        await renderEvents();
+      });
+    });
+  }
+}
+
+document.getElementById('new-event-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('ne-submit');
+  const errorEl = document.getElementById('ne-error');
+  errorEl.classList.add('hidden');
+
+  const title = document.getElementById('ne-title').value.trim();
+  const date = document.getElementById('ne-date').value;
+  const time = document.getElementById('ne-time').value.trim();
+  const location = document.getElementById('ne-location').value.trim();
+  const description = document.getElementById('ne-description').value.trim();
+
+  if (!title || !date) {
+    errorEl.textContent = 'Add a title and a date.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+
+  const { error } = await sb.from('events').insert({
+    title,
+    event_date: date,
+    event_time: time || null,
+    location: location || null,
+    description: description || null,
+    event_type: 'event'
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Add event';
+
+  if (error) {
+    errorEl.textContent = error.message;
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('new-event-form').reset();
+  await renderEvents();
+});
+
+async function init() {
+  const status = await initAccessGate();
+  if (!status.approved) return;
+  isAdmin = status.isAdmin;
+  document.getElementById('page-content').classList.remove('hidden');
+  if (isAdmin) document.getElementById('admin-add-event').classList.remove('hidden');
+  await renderEvents();
+}
+
+init();
+</script>
+</body>
+</html>

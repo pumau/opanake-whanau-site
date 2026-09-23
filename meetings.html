@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meetings — Ōpanake 1C South 6B</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="header">
+<a href="index.html" class="logo">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V6"/><path d="M12 6c0-3 2.5-4.5 5-4.5-0.5 3-2.5 5-5 5"/><path d="M12 10c0-3 2.8-4.7 5.6-4.7-0.6 3.1-2.8 5.2-5.6 5.2"/><path d="M12 6c0-3-2.5-4.5-5-4.5 0.5 3 2.5 5 5 5"/><path d="M12 10c0-3-2.8-4.7-5.6-4.7 0.6 3.1 2.8 5.2 5.6 5.2"/></svg>
+Ōpanake 1C South 6B
+</a>
+<nav class="nav">
+<a href="index.html">Home</a>
+<a href="branches.html">Branches</a>
+<a href="whakapapa.html">Whakapapa</a>
+<a href="history.html">History</a>
+<a href="events.html">Events</a>
+<a href="meetings.html" class="active">Meetings</a>
+<a href="forum.html">Forum</a>
+<a href="archive.html">Archive</a>
+<a href="photos.html">Photos</a>
+<a href="shop.html">Shop</a>
+<a href="raffles.html">Raffles</a>
+<a href="register.html" class="pill" data-nav="login-pill">Register / Login</a>
+<a href="profile.html" class="avatar" data-nav="profile-icon">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+</a>
+</nav>
+</header>
+
+<main>
+
+<div id="access-gate" class="container hidden" style="padding-top: 40px; padding-bottom: 56px;">
+<div class="card" style="max-width: 520px; margin: 0 auto; text-align:center;">
+<h2 id="access-gate-title" style="font-size:19px;">—</h2>
+<p id="access-gate-text" style="margin-top:10px;"></p>
+<a id="access-gate-btn" href="register.html" class="btn" style="margin-top:14px; display:inline-flex;">Register / log in</a>
+</div>
+</div>
+
+<div id="page-content" class="hidden">
+<div class="hero" style="padding-bottom: 8px;">
+<div class="eyebrow">Hui-ā-marama</div>
+<h1 style="font-size: 32px; margin-top: 8px;">Meetings</h1>
+<p>Agenda items and notes for each monthly meeting — any approved member can add to these. Finalise a meeting and its minutes are filed straight into the Archive.</p>
+</div>
+
+<div class="container" style="padding-top: 12px; padding-bottom: 56px;">
+
+<form id="new-meeting-form" class="card" style="margin-bottom: 28px;">
+<h2 style="font-size: 16px; margin: 0 0 16px;">Add a meeting</h2>
+<div class="field">
+<label for="nm-title">Title</label>
+<input id="nm-title" type="text" required placeholder="e.g. October 2026 Trustee Hui">
+</div>
+<div class="field">
+<label for="nm-date">Date (optional)</label>
+<input id="nm-date" type="date">
+</div>
+<div class="field" style="flex-direction: row; align-items: center; gap: 8px;">
+<input id="nm-add-event" type="checkbox" style="width:auto;" checked>
+<label for="nm-add-event" style="margin:0;">Also add this to the Events calendar</label>
+</div>
+<div id="nm-error" class="error-text hidden"></div>
+<button type="submit" id="nm-submit" class="btn">Add meeting</button>
+</form>
+
+<div id="meeting-list" style="display: flex; flex-direction: column; gap: 22px;">
+<div class="help-text">Loading meetings…</div>
+</div>
+
+</div>
+</div>
+</main>
+
+<footer class="footer">© Ōpanake 1C South 6B whānau trust</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-client.js"></script>
+<script>
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+
+function formatDate(d) {
+  if (!d) return 'Date to be confirmed';
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+let session = null;
+let nameById = {};
+
+async function loadNames() {
+  const { data: directory } = await sb.rpc('list_member_directory');
+  nameById = {};
+  (directory || []).forEach((m) => { nameById[m.id] = m.full_name; });
+}
+
+function slugify(s) {
+  return (s || 'meeting').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 60) || 'meeting';
+}
+
+async function renderMeetings() {
+  const listEl = document.getElementById('meeting-list');
+
+  const { data: meetings, error } = await sb
+    .from('meetings')
+    .select('id, title, meeting_date, status, archive_file_id, created_at')
+    .order('meeting_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
+
+  if (error || !meetings) {
+    listEl.innerHTML = '<p class="error-text">Could not load meetings right now.</p>';
+    return;
+  }
+  if (meetings.length === 0) {
+    listEl.innerHTML = '<p class="help-text">No meetings yet — add the first one above.</p>';
+    return;
+  }
+
+  const meetingIds = meetings.map((m) => m.id);
+
+  const { data: agendaItems } = await sb
+    .from('meeting_agenda_items')
+    .select('id, meeting_id, item_text, added_by, created_at')
+    .in('meeting_id', meetingIds)
+    .order('sort_order')
+    .order('created_at');
+
+  const { data: notes } = await sb
+    .from('meeting_notes')
+    .select('id, meeting_id, body, added_by, created_at')
+    .in('meeting_id', meetingIds)
+    .order('created_at');
+
+  const agendaByMeeting = {};
+  (agendaItems || []).forEach((a) => {
+    (agendaByMeeting[a.meeting_id] = agendaByMeeting[a.meeting_id] || []).push(a);
+  });
+  const notesByMeeting = {};
+  (notes || []).forEach((n) => {
+    (notesByMeeting[n.meeting_id] = notesByMeeting[n.meeting_id] || []).push(n);
+  });
+
+  listEl.innerHTML = meetings.map((m) => {
+    const agenda = agendaByMeeting[m.id] || [];
+    const meetingNotes = notesByMeeting[m.id] || [];
+    const completed = m.status === 'completed';
+
+    const agendaHtml = agenda.length
+      ? agenda.map((a) => `
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; padding:8px 0; border-bottom:1px solid var(--border);">
+            <span style="font-size:13.5px;">${escapeHtml(a.item_text)}</span>
+            ${!completed ? `<button type="button" class="btn btn-outline delete-agenda" data-id="${a.id}" style="padding:4px 10px; font-size:11.5px; flex-shrink:0;">Remove</button>` : ''}
+          </div>`).join('')
+      : '<p class="help-text" style="padding: 6px 0;">No agenda items yet.</p>';
+
+    const notesHtml = meetingNotes.length
+      ? meetingNotes.map((n) => `
+          <div style="padding:10px 0; border-bottom:1px solid var(--border);">
+            <div style="font-size:12px; color: var(--ink-soft); margin-bottom:3px;">${escapeHtml(nameById[n.added_by] || 'A whānau member')} · ${formatDateTime(n.created_at)}</div>
+            <div style="font-size:13.5px; white-space: pre-wrap;">${escapeHtml(n.body)}</div>
+          </div>`).join('')
+      : '<p class="help-text" style="padding: 6px 0;">No notes yet.</p>';
+
+    return `
+      <div class="card" data-meeting-id="${m.id}">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+          <div>
+            <h2 style="font-size:18px; margin:0;">${escapeHtml(m.title)}</h2>
+            <div class="help-text" style="margin-top:4px;">${formatDate(m.meeting_date)}</div>
+          </div>
+          <span class="badge ${completed ? 'badge-approved' : 'badge-pending'}">${completed ? 'Minutes filed' : 'Scheduled'}</span>
+        </div>
+
+        <div style="margin-top:18px;">
+          <h3 style="font-size:13.5px; text-transform:uppercase; letter-spacing:0.5px; color:var(--ink-soft); margin:0 0 6px;">Agenda</h3>
+          ${agendaHtml}
+          ${!completed ? `
+            <form class="add-agenda-form" data-meeting-id="${m.id}" style="display:flex; gap:8px; margin-top:10px;">
+              <input type="text" placeholder="Add an agenda item…" required style="flex:1; font:inherit; font-size:13.5px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg);">
+              <button type="submit" class="btn btn-outline" style="font-size:12.5px; padding:8px 14px;">Add</button>
+            </form>` : ''}
+        </div>
+
+        <div style="margin-top:18px;">
+          <h3 style="font-size:13.5px; text-transform:uppercase; letter-spacing:0.5px; color:var(--ink-soft); margin:0 0 6px;">Notes</h3>
+          ${notesHtml}
+          ${!completed ? `
+            <form class="add-note-form" data-meeting-id="${m.id}" style="margin-top:10px;">
+              <textarea placeholder="Add a note…" required rows="2" style="width:100%; font:inherit; font-size:13.5px; padding:9px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--ink); resize:vertical;"></textarea>
+              <button type="submit" class="btn btn-outline" style="font-size:12.5px; padding:8px 14px; margin-top:8px;">Add note</button>
+            </form>` : ''}
+        </div>
+
+        ${!completed ? `
+          <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
+            <button type="button" class="btn finalise-btn" data-meeting-id="${m.id}">Finalise meeting &amp; save minutes to Archive</button>
+            <p class="help-text" style="margin-top:8px;">This writes out the agenda and notes as a document and files it in the Archive under Meeting minutes. No more agenda items or notes can be added after that.</p>
+          </div>` : `
+          <p class="help-text" style="margin-top:16px;">Minutes filed in the <a href="archive.html" style="color:var(--accent-dark); font-weight:600;">Archive</a>.</p>`}
+      </div>`;
+  }).join('');
+
+  wireMeetingActions();
+}
+
+function wireMeetingActions() {
+  document.querySelectorAll('.add-agenda-form').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = form.querySelector('input');
+      const text = input.value.trim();
+      if (!text) return;
+      const meetingId = form.getAttribute('data-meeting-id');
+      const { error } = await sb.from('meeting_agenda_items').insert({
+        meeting_id: meetingId,
+        item_text: text,
+        added_by: session.user.id
+      });
+      if (error) { alert(error.message); return; }
+      await renderMeetings();
+    });
+  });
+
+  document.querySelectorAll('.add-note-form').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const textarea = form.querySelector('textarea');
+      const body = textarea.value.trim();
+      if (!body) return;
+      const meetingId = form.getAttribute('data-meeting-id');
+      const { error } = await sb.from('meeting_notes').insert({
+        meeting_id: meetingId,
+        body,
+        added_by: session.user.id
+      });
+      if (error) { alert(error.message); return; }
+      await renderMeetings();
+    });
+  });
+
+  document.querySelectorAll('.delete-agenda').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      await sb.from('meeting_agenda_items').delete().eq('id', btn.getAttribute('data-id'));
+      await renderMeetings();
+    });
+  });
+
+  document.querySelectorAll('.finalise-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Finalise this meeting and file its minutes in the Archive? No more agenda items or notes can be added afterwards.')) return;
+      btn.disabled = true;
+      btn.textContent = 'Filing minutes…';
+      await finaliseMeeting(btn.getAttribute('data-meeting-id'));
+    });
+  });
+}
+
+async function finaliseMeeting(meetingId) {
+  const { data: meeting } = await sb.from('meetings').select('id, title, meeting_date').eq('id', meetingId).single();
+  const { data: agenda } = await sb.from('meeting_agenda_items').select('item_text').eq('meeting_id', meetingId).order('sort_order').order('created_at');
+  const { data: notes } = await sb.from('meeting_notes').select('body, added_by, created_at').eq('meeting_id', meetingId).order('created_at');
+
+  if (!meeting) { alert("Couldn't find that meeting."); return; }
+
+  const lines = [];
+  lines.push(meeting.title);
+  lines.push(formatDate(meeting.meeting_date));
+  lines.push('Ōpanake 1C South 6B whānau trust');
+  lines.push('');
+  lines.push('AGENDA');
+  lines.push('------');
+  if (agenda && agenda.length) {
+    agenda.forEach((a, i) => lines.push(`${i + 1}. ${a.item_text}`));
+  } else {
+    lines.push('(no agenda items recorded)');
+  }
+  lines.push('');
+  lines.push('NOTES');
+  lines.push('-----');
+  if (notes && notes.length) {
+    notes.forEach((n) => {
+      lines.push(`[${formatDateTime(n.created_at)} — ${escapeHtml(nameById[n.added_by] || 'A whānau member').replace(/&amp;/g, '&')}]`);
+      lines.push(n.body);
+      lines.push('');
+    });
+  } else {
+    lines.push('(no notes recorded)');
+  }
+
+  const text = lines.join('\n');
+  const blob = new Blob([text], { type: 'text/plain' });
+  const storagePath = `minutes/${Date.now()}-${slugify(meeting.title)}.txt`;
+
+  const { error: uploadError } = await sb.storage.from('archive').upload(storagePath, blob, { contentType: 'text/plain' });
+  if (uploadError) { alert("Couldn't save the minutes file — " + uploadError.message); return; }
+
+  const { data: fileRow, error: fileError } = await sb.from('archive_files').insert({
+    title: `${meeting.title} — minutes`,
+    category: 'minutes',
+    storage_path: storagePath,
+    uploaded_by: session.user.id
+  }).select('id').single();
+
+  if (fileError || !fileRow) { alert("Saved the file, but couldn't record it in the Archive — " + (fileError && fileError.message)); return; }
+
+  await sb.from('meetings').update({ status: 'completed', archive_file_id: fileRow.id }).eq('id', meetingId);
+
+  await renderMeetings();
+}
+
+document.getElementById('new-meeting-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('nm-submit');
+  const errorEl = document.getElementById('nm-error');
+  errorEl.classList.add('hidden');
+
+  const title = document.getElementById('nm-title').value.trim();
+  const date = document.getElementById('nm-date').value;
+  const addEvent = document.getElementById('nm-add-event').checked;
+
+  if (!title) {
+    errorEl.textContent = 'Give the meeting a title first.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+
+  const { data: meeting, error } = await sb.from('meetings').insert({
+    title,
+    meeting_date: date || null,
+    created_by: session.user.id
+  }).select('id').single();
+
+  btn.disabled = false;
+  btn.textContent = 'Add meeting';
+
+  if (error || !meeting) {
+    errorEl.textContent = (error && error.message) || "Couldn't add that meeting — try again.";
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  if (addEvent && date) {
+    await sb.from('events').insert({
+      title,
+      event_date: date,
+      event_type: 'meeting',
+      meeting_id: meeting.id,
+      created_by: session.user.id
+    });
+  }
+
+  document.getElementById('new-meeting-form').reset();
+  document.getElementById('nm-add-event').checked = true;
+  await renderMeetings();
+});
+
+async function init() {
+  const status = await initAccessGate();
+  if (!status.approved) return;
+  session = status.session;
+  document.getElementById('page-content').classList.remove('hidden');
+  await loadNames();
+  await renderMeetings();
+}
+
+init();
+</script>
+</body>
+</html>
