@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Whakapapa — Ōpanake 1C South 6B</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="header">
+<a href="index.html" class="logo">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V6"/><path d="M12 6c0-3 2.5-4.5 5-4.5-0.5 3-2.5 5-5 5"/><path d="M12 10c0-3 2.8-4.7 5.6-4.7-0.6 3.1-2.8 5.2-5.6 5.2"/><path d="M12 6c0-3-2.5-4.5-5-4.5 0.5 3 2.5 5 5 5"/><path d="M12 10c0-3-2.8-4.7-5.6-4.7 0.6 3.1 2.8 5.2 5.6 5.2"/></svg>
+Ōpanake 1C South 6B
+</a>
+<nav class="nav">
+<a href="index.html">Home</a>
+<a href="branches.html">Branches</a>
+<a href="whakapapa.html" class="active">Whakapapa</a>
+<a href="history.html">History</a>
+<a href="register.html" class="pill" data-nav="login-pill">Register / Login</a>
+<a href="profile.html" class="avatar" data-nav="profile-icon">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+</a>
+</nav>
+</header>
+
+<main>
+<div class="hero" style="text-align: center; padding-bottom: 8px;">
+<div class="eyebrow">Whakapapa</div>
+<h1 style="font-size: 32px; margin-top: 8px; max-width: 680px; margin-left: auto; margin-right: auto;">See how we're all connected</h1>
+<p style="margin-left: auto; margin-right: auto;">Every branch traces back to Irihapeti Patuawa. Follow the lines down to find your branch, or browse other registered whānau below.</p>
+<div id="members-only-badge" class="hidden" style="display: inline-flex; align-items: center; gap: 8px; background: var(--accent-2-soft); color: #7A4E18; padding: 8px 16px; border-radius: 999px; font-size: 12.5px; font-weight: 600; margin-top: 14px;">
+Members only — log in to view the full whānau directory
+</div>
+</div>
+
+<div class="container" style="padding: 32px 56px 8px; display: flex; justify-content: center;">
+<div style="max-width: 900px; width: 100%;">
+
+<div style="display: flex; justify-content: center;">
+<div style="background: var(--river-soft); border: 2px solid var(--river); border-radius: 16px; padding: 16px 28px; text-align: center;">
+<div style="font-size: 11px; font-weight: 700; letter-spacing: 1.5px; color: var(--river); text-transform: uppercase;">Shared tupuna</div>
+<div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 18px; margin-top: 4px;">Irihapeti (Peti Betty) Howearth née Patuawa</div>
+<div class="help-text" style="margin-top: 2px;">Mamaranui, Kaihu</div>
+</div>
+</div>
+
+<div style="display: flex; justify-content: center; margin: 4px 0;">
+<div style="width: 3px; height: 26px; background: var(--river); border-radius: 2px;"></div>
+</div>
+
+<div id="branch-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
+<div class="help-text">Loading branches…</div>
+</div>
+
+</div>
+</div>
+
+<div class="container" style="padding: 40px 56px 56px; display: flex; justify-content: center;">
+<div style="max-width: 900px; width: 100%;">
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+<h2 style="margin: 0; font-size: 20px;">Whānau members</h2>
+<div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+<input id="member-search" type="text" placeholder="Search whānau…" style="font: inherit; font-size: 13px; padding: 9px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface);">
+<select id="member-branch-filter" style="font: inherit; font-size: 13px; padding: 9px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--ink-soft); font-weight: 600;">
+<option value="">All branches</option>
+</select>
+</div>
+</div>
+
+<div id="directory-gated" class="card card-muted hidden" style="text-align: center;">
+<p style="margin: 0;">The whānau directory is visible to signed-in, approved members. <a href="register.html" style="color: var(--accent-dark); font-weight: 600;">Register or log in</a> to see it.</p>
+</div>
+
+<div id="directory-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px;"></div>
+<p id="directory-count" class="help-text" style="margin-top: 14px; text-align: center;"></p>
+</div>
+</div>
+</main>
+
+<footer class="footer">© Ōpanake 1C South 6B whānau trust</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-client.js"></script>
+<script>
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+
+function initials(name) {
+  if (!name) return '?';
+  return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+}
+
+let allBranches = [];
+let allMembers = [];
+
+function renderDirectory() {
+  const grid = document.getElementById('directory-grid');
+  const search = document.getElementById('member-search').value.trim().toLowerCase();
+  const branchFilter = document.getElementById('member-branch-filter').value;
+
+  const branchNameById = {};
+  allBranches.forEach((b) => { branchNameById[b.id] = b.name; });
+
+  let members = allMembers.filter((m) => {
+    if (branchFilter && m.branch_id !== branchFilter) return false;
+    if (search && !(m.full_name || '').toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  document.getElementById('directory-count').textContent =
+    `Showing ${members.length} of ${allMembers.length} registered whānau. Only your name, branch and join date are visible to others — nothing else from your profile is shared here.`;
+
+  grid.innerHTML = members
+    .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))
+    .map((m) => {
+      const year = m.joined_at ? new Date(m.joined_at).getFullYear() : '';
+      const branchName = branchNameById[m.branch_id] || 'No branch set';
+      return `<div class="card" style="display:flex; align-items:center; gap:14px; padding:16px;">
+        <div style="width:44px;height:44px;border-radius:999px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-family:Fraunces,serif;font-weight:700;font-size:14px;color:var(--accent-dark);flex-shrink:0;">${escapeHtml(initials(m.full_name))}</div>
+        <div>
+          <div style="font-weight:600;font-size:14px;">${escapeHtml(m.full_name || 'Unnamed member')}</div>
+          <div class="help-text" style="margin-top:2px;">${escapeHtml(branchName)}${year ? ' · since ' + year : ''}</div>
+        </div>
+      </div>`;
+    }).join('');
+}
+
+async function loadWhakapapa() {
+  const { data: branches } = await sb.from('branches').select('id, name, sort_order').order('sort_order');
+  allBranches = branches || [];
+
+  const { data: directory, error: dirError } = await sb.rpc('list_member_directory');
+
+  const branchGrid = document.getElementById('branch-grid');
+  let counts = {};
+  if (directory) directory.forEach((m) => { if (m.branch_id) counts[m.branch_id] = (counts[m.branch_id] || 0) + 1; });
+
+  branchGrid.innerHTML = allBranches.map((b, i) => `
+    <a href="branch.html?id=${encodeURIComponent(b.id)}" style="background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 6px;">
+      <div style="width:34px;height:34px;border-radius:9px;background:var(--accent-2-soft);display:flex;align-items:center;justify-content:center;font-family:Fraunces,serif;font-weight:700;font-size:14px;color:var(--accent-2);">${i + 1}</div>
+      <span style="font-weight:600;font-size:14px;margin-top:4px;">${escapeHtml(b.name)}</span>
+      <span class="help-text">${counts[b.id] ? counts[b.id] + ' whānau linked' : 'No one linked yet'}</span>
+    </a>
+  `).join('');
+
+  const branchSelect = document.getElementById('member-branch-filter');
+  allBranches.forEach((b) => {
+    const opt = document.createElement('option');
+    opt.value = b.id;
+    opt.textContent = b.name;
+    branchSelect.appendChild(opt);
+  });
+
+  if (dirError || !directory) {
+    document.getElementById('members-only-badge').classList.remove('hidden');
+    document.getElementById('directory-gated').classList.remove('hidden');
+    return;
+  }
+
+  allMembers = directory;
+  renderDirectory();
+  document.getElementById('member-search').addEventListener('input', renderDirectory);
+  document.getElementById('member-branch-filter').addEventListener('change', renderDirectory);
+}
+
+loadWhakapapa();
+</script>
+</body>
+</html>
