@@ -16,6 +16,7 @@
 <nav class="nav">
 <a href="index.html">Home</a>
 <a href="register.html" class="active">Register</a>
+<a href="branches.html">Branches</a>
 <a href="register.html" class="pill" data-nav="login-pill">Register / Login</a>
 <a href="profile.html" class="avatar" data-nav="profile-icon">
 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
@@ -110,6 +111,11 @@ async function loadBranches() {
   }
   select.innerHTML = '<option value="">Choose your branch…</option>' +
     data.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+
+  const preselect = new URLSearchParams(window.location.search).get('branch');
+  if (preselect && data.some((b) => b.id === preselect)) {
+    select.value = preselect;
+  }
 }
 
 function escapeHtml(s) {

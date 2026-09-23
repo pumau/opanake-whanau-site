@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Branch — Ōpanake 1C South 6B</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="header">
+<a href="index.html" class="logo">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V6"/><path d="M12 6c0-3 2.5-4.5 5-4.5-0.5 3-2.5 5-5 5"/><path d="M12 10c0-3 2.8-4.7 5.6-4.7-0.6 3.1-2.8 5.2-5.6 5.2"/><path d="M12 6c0-3-2.5-4.5-5-4.5 0.5 3 2.5 5 5 5"/><path d="M12 10c0-3-2.8-4.7-5.6-4.7 0.6 3.1 2.8 5.2 5.6 5.2"/></svg>
+Ōpanake 1C South 6B
+</a>
+<nav class="nav">
+<a href="index.html">Home</a>
+<a href="branches.html" class="active">Branches</a>
+<a href="register.html" class="pill" data-nav="login-pill">Register / Login</a>
+<a href="profile.html" class="avatar" data-nav="profile-icon">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+</a>
+</nav>
+</header>
+
+<main>
+<div class="container" style="padding-top: 20px;">
+<a href="branches.html" style="color: var(--accent-dark); font-weight: 600; font-size: 13px;">← The 9 branches</a>
+</div>
+
+<div id="loading" class="container" style="padding: 20px 56px;">
+<p class="help-text">Loading…</p>
+</div>
+
+<div id="not-found" class="container hidden" style="padding: 20px 56px 56px;">
+<div class="card">
+<h2 style="font-size: 18px;">Branch not found</h2>
+<p style="margin-top: 8px;">That branch doesn't seem to exist — head back to the <a href="branches.html" style="color: var(--accent); font-weight: 600;">branches page</a>.</p>
+</div>
+</div>
+
+<div id="branch-content" class="hidden">
+<div class="container" style="padding: 20px 56px 32px; display:flex; gap:24px; align-items:center; flex-wrap: wrap;">
+<div id="branch-num" style="width:72px;height:72px;border-radius:16px;background:var(--accent-2-soft);display:flex;align-items:center;justify-content:center;font-family:Fraunces,serif;font-weight:700;font-size:28px;color:var(--accent-2);flex-shrink:0;"></div>
+<div>
+<h1 id="branch-name" style="font-size: 32px;">—</h1>
+<div id="branch-count" class="help-text" style="margin-top: 4px;"></div>
+</div>
+</div>
+
+<div class="container" style="padding: 0 56px 56px; display:flex; gap:24px; flex-wrap: wrap;">
+<div style="flex: 2; min-width: 280px;">
+<div class="card">
+<h2 style="font-size: 19px;">Registered whānau</h2>
+<div id="member-list" style="margin-top: 16px; display:flex; flex-direction:column; gap: 10px;"></div>
+</div>
+</div>
+
+<div style="flex: 1; min-width: 240px;">
+<div class="card-muted" style="border-radius:16px; padding:24px;">
+<h3 style="font-size: 15px; margin: 0 0 10px;">Whakapapa to this branch?</h3>
+<p class="help-text" style="margin-bottom: 16px;">Register and select this branch — an admin will confirm your account before it's fully activated.</p>
+<a id="register-link" href="register.html" class="btn" style="display:block; text-align:center;">Register for this branch</a>
+</div>
+</div>
+</div>
+</div>
+
+</main>
+
+<footer class="footer">© Ōpanake 1C South 6B whānau trust</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-client.js"></script>
+<script>
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+
+async function loadBranch() {
+  const params = new URLSearchParams(window.location.search);
+  const branchId = params.get('id');
+  const loading = document.getElementById('loading');
+  const notFound = document.getElementById('not-found');
+  const content = document.getElementById('branch-content');
+
+  if (!branchId) {
+    loading.classList.add('hidden');
+    notFound.classList.remove('hidden');
+    return;
+  }
+
+  const { data: allBranches, error: branchError } = await sb
+    .from('branches')
+    .select('id, name, sort_order')
+    .order('sort_order');
+
+  const branch = allBranches ? allBranches.find((b) => b.id === branchId) : null;
+
+  if (branchError || !branch) {
+    loading.classList.add('hidden');
+    notFound.classList.remove('hidden');
+    return;
+  }
+
+  const position = allBranches.findIndex((b) => b.id === branchId) + 1;
+  document.getElementById('branch-num').textContent = position;
+  document.getElementById('branch-name').textContent = branch.name;
+  document.getElementById('register-link').href = `register.html?branch=${encodeURIComponent(branch.id)}`;
+
+  const { data: directory, error: dirError } = await sb.rpc('list_member_directory');
+  const memberListEl = document.getElementById('member-list');
+  const countEl = document.getElementById('branch-count');
+
+  if (dirError || !directory) {
+    countEl.textContent = 'Sign in as an approved member to see who else is registered.';
+    memberListEl.innerHTML = '<p class="help-text">The member list is visible to signed-in, approved members.</p>';
+  } else {
+    const members = directory.filter((m) => m.branch_id === branchId);
+    countEl.textContent = members.length ? `${members.length} registered whānau` : 'No registered whānau yet';
+    if (members.length === 0) {
+      memberListEl.innerHTML = '<p class="help-text">Nobody from this branch has registered yet — be the first.</p>';
+    } else {
+      memberListEl.innerHTML = members
+        .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))
+        .map((m) => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;">${escapeHtml(m.full_name || 'Unnamed member')}</div>`)
+        .join('');
+    }
+  }
+
+  loading.classList.add('hidden');
+  content.classList.remove('hidden');
+}
+
+loadBranch();
+</script>
+</body>
+</html>

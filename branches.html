@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The 9 branches — Ōpanake 1C South 6B</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="header">
+<a href="index.html" class="logo">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V6"/><path d="M12 6c0-3 2.5-4.5 5-4.5-0.5 3-2.5 5-5 5"/><path d="M12 10c0-3 2.8-4.7 5.6-4.7-0.6 3.1-2.8 5.2-5.6 5.2"/><path d="M12 6c0-3-2.5-4.5-5-4.5 0.5 3 2.5 5 5 5"/><path d="M12 10c0-3-2.8-4.7-5.6-4.7 0.6 3.1 2.8 5.2 5.6 5.2"/></svg>
+Ōpanake 1C South 6B
+</a>
+<nav class="nav">
+<a href="index.html">Home</a>
+<a href="branches.html" class="active">Branches</a>
+<a href="register.html" class="pill" data-nav="login-pill">Register / Login</a>
+<a href="profile.html" class="avatar" data-nav="profile-icon">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+</a>
+</nav>
+</header>
+
+<main>
+<div class="hero" style="padding-bottom: 8px;">
+<div class="eyebrow">Ngā Pī — the branches</div>
+<h1 style="font-size: 32px; margin-top: 8px;">The 9 sibling branches</h1>
+<p>Every descendant of Irihapeti Patuawa belongs to one of nine sibling lines. Find your branch below, and see who else has registered.</p>
+</div>
+
+<div class="container" style="padding-top: 12px; padding-bottom: 56px;">
+
+<div id="admin-hint" class="card card-muted hidden" style="margin-bottom: 20px; font-size: 13.5px;">
+You're an admin, so you can rename branches below. Click a name to edit it.
+</div>
+
+<div id="branch-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px;">
+<div class="help-text">Loading branches…</div>
+</div>
+
+</div>
+</main>
+
+<footer class="footer">© Ōpanake 1C South 6B whānau trust</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-client.js"></script>
+<script>
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+
+let isAdmin = false;
+
+async function checkAdmin() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return false;
+  const { data } = await sb.from('profiles').select('role').eq('id', session.user.id).single();
+  return !!(data && data.role === 'admin');
+}
+
+async function loadBranches() {
+  const grid = document.getElementById('branch-grid');
+
+  const { data: branches, error: branchError } = await sb
+    .from('branches')
+    .select('id, name, sort_order')
+    .order('sort_order');
+
+  if (branchError || !branches) {
+    grid.innerHTML = '<div class="error-text">Could not load branches right now.</div>';
+    return;
+  }
+
+  // Member counts — only resolves for signed-in approved members; for
+  // anyone else this quietly comes back empty and we just skip counts.
+  let counts = {};
+  const { data: directory } = await sb.rpc('list_member_directory');
+  if (directory) {
+    directory.forEach((m) => {
+      if (m.branch_id) counts[m.branch_id] = (counts[m.branch_id] || 0) + 1;
+    });
+  }
+
+  isAdmin = await checkAdmin();
+  if (isAdmin) document.getElementById('admin-hint').classList.remove('hidden');
+
+  grid.innerHTML = '';
+  branches.forEach((b, i) => {
+    const count = counts[b.id];
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.display = 'flex';
+    card.style.flexDirection = 'column';
+    card.style.gap = '10px';
+
+    const num = document.createElement('div');
+    num.style.cssText = 'width:40px;height:40px;border-radius:10px;background:var(--accent-2-soft);display:flex;align-items:center;justify-content:center;font-family:Fraunces,serif;font-weight:700;color:var(--accent-2);';
+    num.textContent = (i + 1);
+    card.appendChild(num);
+
+    const nameRow = document.createElement('div');
+    if (isAdmin) {
+      nameRow.innerHTML = `<input data-branch-id="${b.id}" class="branch-name-input" value="${escapeHtml(b.name)}" style="font:inherit;font-weight:600;font-size:16px;border:1px solid var(--border);border-radius:8px;padding:6px 8px;width:100%;background:var(--bg);">`;
+    } else {
+      const nameLink = document.createElement('a');
+      nameLink.href = `branch.html?id=${encodeURIComponent(b.id)}`;
+      nameLink.style.fontWeight = '600';
+      nameLink.style.fontSize = '16px';
+      nameLink.textContent = b.name;
+      nameRow.appendChild(nameLink);
+    }
+    card.appendChild(nameRow);
+
+    const countEl = document.createElement('span');
+    countEl.className = 'help-text';
+    countEl.textContent = count ? `${count} registered whānau` : 'No registered whānau yet';
+    card.appendChild(countEl);
+
+    const viewLink = document.createElement('a');
+    viewLink.href = `branch.html?id=${encodeURIComponent(b.id)}`;
+    viewLink.style.cssText = 'font-size:13.5px;font-weight:600;color:var(--accent-dark);margin-top:4px;';
+    viewLink.textContent = 'View branch →';
+    card.appendChild(viewLink);
+
+    grid.appendChild(card);
+  });
+
+  if (isAdmin) {
+    document.querySelectorAll('.branch-name-input').forEach((input) => {
+      input.addEventListener('change', async () => {
+        const id = input.getAttribute('data-branch-id');
+        const name = input.value.trim();
+        if (!name) return;
+        const { error } = await sb.from('branches').update({ name }).eq('id', id);
+        if (error) {
+          alert("Couldn't save that name — " + error.message);
+        }
+      });
+    });
+  }
+}
+
+loadBranches();
+</script>
+</body>
+</html>
