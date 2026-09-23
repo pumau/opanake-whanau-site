@@ -60,10 +60,17 @@
 <input id="su-password" type="password" required minlength="6" autocomplete="new-password">
 <span class="help-text">At least 6 characters.</span>
 </div>
+<div class="field">
+<label for="su-branch">Which branch do you whakapapa to?</label>
+<select id="su-branch">
+<option value="">Loading branches…</option>
+</select>
+<span class="help-text">Not sure? Choose "Not sure / help me work it out" and an admin will help sort it at approval time.</span>
+</div>
 <div id="signup-error" class="error-text hidden"></div>
 <div id="signup-success" class="hidden" style="background: var(--river-soft); border: 1px solid var(--river); border-radius: 10px; padding: 14px 16px; font-size: 13.5px; margin-bottom: 16px;"></div>
 <button type="submit" id="signup-btn" class="btn">Create my account</button>
-<p class="help-text" style="margin-top: 14px;">An admin approves new accounts (and sets your branch) before you get full access to the members' area — you'll be able to see your status on your profile page once you're signed in.</p>
+<p class="help-text" style="margin-top: 14px;">An admin approves new accounts before you get full access to the members' area — you'll be able to see your status on your profile page once you're signed in.</p>
 </form>
 
 <form id="login-form" class="card hidden">
@@ -111,6 +118,27 @@ function escapeHtml(s) {
   return div.innerHTML;
 }
 
+async function loadBranches() {
+  const branchSelect = document.getElementById('su-branch');
+  const { data: branches, error } = await sb.rpc('list_branches_for_signup');
+
+  const unknownOption = '<option value="">Not sure / help me work it out</option>';
+
+  if (error || !branches) {
+    branchSelect.innerHTML = unknownOption;
+    return;
+  }
+
+  branchSelect.innerHTML = unknownOption +
+    branches.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+
+  const params = new URLSearchParams(window.location.search);
+  const preselect = params.get('branch');
+  if (preselect && branches.some((b) => b.id === preselect)) {
+    branchSelect.value = preselect;
+  }
+}
+
 signupForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const btn = document.getElementById('signup-btn');
@@ -124,11 +152,12 @@ signupForm.addEventListener('submit', async (e) => {
   const fullName = document.getElementById('su-name').value.trim();
   const email = document.getElementById('su-email').value.trim();
   const password = document.getElementById('su-password').value;
+  const branchId = document.getElementById('su-branch').value || null;
 
   const { data, error } = await sb.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName } }
+    options: { data: { full_name: fullName, branch_id: branchId } }
   });
 
   btn.disabled = false;
@@ -174,6 +203,8 @@ loginForm.addEventListener('submit', async (e) => {
   }
   window.location.href = 'profile.html';
 });
+
+loadBranches();
 </script>
 </body>
 </html>
