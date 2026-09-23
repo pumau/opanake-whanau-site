@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shop — Ōpanake 1C South 6B</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="header">
+<a href="index.html" class="logo">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V6"/><path d="M12 6c0-3 2.5-4.5 5-4.5-0.5 3-2.5 5-5 5"/><path d="M12 10c0-3 2.8-4.7 5.6-4.7-0.6 3.1-2.8 5.2-5.6 5.2"/><path d="M12 6c0-3-2.5-4.5-5-4.5 0.5 3 2.5 5 5 5"/><path d="M12 10c0-3-2.8-4.7-5.6-4.7 0.6 3.1 2.8 5.2 5.6 5.2"/></svg>
+Ōpanake 1C South 6B
+</a>
+<nav class="nav">
+<a href="index.html">Home</a>
+<a href="branches.html">Branches</a>
+<a href="whakapapa.html">Whakapapa</a>
+<a href="history.html">History</a>
+<a href="forum.html">Forum</a>
+<a href="archive.html">Archive</a>
+<a href="photos.html">Photos</a>
+<a href="shop.html" class="active">Shop</a>
+<a href="register.html" class="pill" data-nav="login-pill">Register / Login</a>
+<a href="profile.html" class="avatar" data-nav="profile-icon">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+</a>
+</nav>
+</header>
+
+<main>
+<div class="hero" style="padding-bottom: 8px;">
+<div class="eyebrow">Shop</div>
+<h1 style="font-size: 32px; margin-top: 8px;">Whānau shop</h1>
+<p>Place an order and we'll follow up with an invoice — no payment on the site yet.</p>
+</div>
+
+<div class="container" style="padding-top: 12px; padding-bottom: 40px;">
+
+<div id="order-gate" class="card card-muted hidden" style="margin-bottom: 24px; text-align: center;">
+<p style="margin: 0;">Sign in as an approved member to place an order. <a href="register.html" style="color: var(--accent-dark); font-weight: 600;">Register or log in</a>.</p>
+</div>
+
+<div id="order-success" class="card hidden" style="margin-bottom: 24px; background: var(--river-soft); border: 1px solid var(--river);">
+<p style="margin: 0;">Thanks — your order's in. We'll be in touch with an invoice.</p>
+</div>
+
+<form id="order-form">
+<div id="product-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;">
+<div class="help-text">Loading products…</div>
+</div>
+
+<div id="order-footer" class="hidden" style="margin-top: 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap: wrap; gap: 12px;">
+<div style="font-weight: 600;">Total: <span id="order-total">$0.00</span></div>
+<button type="submit" id="order-submit" class="btn">Place order</button>
+</div>
+<div id="order-error" class="error-text hidden" style="margin-top: 10px;"></div>
+</form>
+
+</div>
+
+<div id="admin-section" class="container hidden" style="padding-bottom: 56px;">
+<h2 style="font-size: 20px;">Shop admin</h2>
+
+<form id="add-product-form" class="card" style="margin-top: 16px; margin-bottom: 24px;">
+<h3 style="font-size: 15px; margin: 0 0 14px;">Add a product</h3>
+<div class="field">
+<label for="np-name">Name</label>
+<input id="np-name" type="text" required>
+</div>
+<div class="field">
+<label for="np-variant">Variant (optional)</label>
+<input id="np-variant" type="text" placeholder="e.g. size, colour">
+</div>
+<div class="field">
+<label for="np-price">Price (NZD)</label>
+<input id="np-price" type="number" min="0" step="0.01" required>
+</div>
+<div class="field">
+<label for="np-image">Image (optional)</label>
+<input id="np-image" type="file" accept="image/*">
+</div>
+<div id="np-error" class="error-text hidden"></div>
+<button type="submit" id="np-submit" class="btn">Add product</button>
+</form>
+
+<h3 style="font-size: 17px;">Orders</h3>
+<div id="order-list" style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+<div class="help-text">Loading orders…</div>
+</div>
+</div>
+
+</main>
+
+<footer class="footer">© Ōpanake 1C South 6B whānau trust</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-client.js"></script>
+<script>
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+function money(cents) { return '$' + (cents / 100).toFixed(2); }
+function formatDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+let session = null;
+let isAdmin = false;
+let products = [];
+
+async function loadProducts() {
+  const { data, error } = await sb
+    .from('products')
+    .select('id, name, variant, price_cents, image_path, active')
+    .eq('active', true)
+    .order('name');
+
+  const grid = document.getElementById('product-grid');
+  if (error || !data) {
+    grid.innerHTML = '<p class="error-text">Could not load products right now.</p>';
+    return;
+  }
+  products = data;
+
+  if (products.length === 0) {
+    grid.innerHTML = '<p class="help-text">Nothing in the shop yet.</p>';
+    return;
+  }
+
+  grid.innerHTML = products.map((p) => {
+    const imgUrl = p.image_path ? sb.storage.from('products').getPublicUrl(p.image_path).data.publicUrl : '';
+    return `
+      <div class="card" style="padding: 0; overflow: hidden;">
+        ${imgUrl ? `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(p.name)}" style="width:100%; height:150px; object-fit:cover; display:block;">` : `<div style="height:150px; background: var(--surface-2);"></div>`}
+        <div style="padding: 16px;">
+          <div style="font-weight:600; font-size:14.5px;">${escapeHtml(p.name)}${p.variant ? ' — ' + escapeHtml(p.variant) : ''}</div>
+          <div class="help-text" style="margin-top:4px;">${money(p.price_cents)}</div>
+          ${session ? `
+            <div style="margin-top:10px; display:flex; align-items:center; gap:8px;">
+              <label style="font-size:12.5px; color: var(--ink-soft);" for="qty-${p.id}">Qty</label>
+              <input type="number" min="0" value="0" id="qty-${p.id}" data-product-id="${p.id}" class="qty-input" style="width:64px; font:inherit; font-size:13px; padding:6px 8px; border:1px solid var(--border); border-radius:6px; background:var(--bg);">
+            </div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  if (session) {
+    document.getElementById('order-footer').classList.remove('hidden');
+    document.querySelectorAll('.qty-input').forEach((input) => {
+      input.addEventListener('input', updateTotal);
+    });
+    updateTotal();
+  } else {
+    document.getElementById('order-gate').classList.remove('hidden');
+  }
+}
+
+function updateTotal() {
+  let total = 0;
+  document.querySelectorAll('.qty-input').forEach((input) => {
+    const qty = parseInt(input.value, 10) || 0;
+    const product = products.find((p) => p.id === input.getAttribute('data-product-id'));
+    if (product) total += qty * product.price_cents;
+  });
+  document.getElementById('order-total').textContent = money(total);
+}
+
+document.getElementById('order-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById('order-error');
+  errorEl.classList.add('hidden');
+
+  const items = [];
+  let total = 0;
+  document.querySelectorAll('.qty-input').forEach((input) => {
+    const qty = parseInt(input.value, 10) || 0;
+    if (qty > 0) {
+      const product = products.find((p) => p.id === input.getAttribute('data-product-id'));
+      if (product) {
+        items.push({ product_id: product.id, name: product.name, variant: product.variant || null, price_cents: product.price_cents, qty });
+        total += qty * product.price_cents;
+      }
+    }
+  });
+
+  if (items.length === 0) {
+    errorEl.textContent = 'Choose at least one item first.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('order-submit');
+  btn.disabled = true;
+  btn.textContent = 'Placing order…';
+
+  const { error } = await sb.from('orders').insert({
+    member_id: session.user.id,
+    items,
+    total_cents: total
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Place order';
+
+  if (error) {
+    errorEl.textContent = error.message;
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('order-form').reset();
+  document.querySelectorAll('.qty-input').forEach((i) => { i.value = 0; });
+  updateTotal();
+  document.getElementById('order-success').classList.remove('hidden');
+});
+
+document.getElementById('add-product-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('np-submit');
+  const errorEl = document.getElementById('np-error');
+  errorEl.classList.add('hidden');
+
+  const name = document.getElementById('np-name').value.trim();
+  const variant = document.getElementById('np-variant').value.trim();
+  const priceNzd = parseFloat(document.getElementById('np-price').value);
+  const fileInput = document.getElementById('np-image');
+  const file = fileInput.files[0];
+
+  if (!name || isNaN(priceNzd)) {
+    errorEl.textContent = 'Add a name and a price.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+
+  let imagePath = null;
+  if (file) {
+    imagePath = `${Date.now()}-${file.name}`;
+    const { error: uploadError } = await sb.storage.from('products').upload(imagePath, file);
+    if (uploadError) {
+      errorEl.textContent = uploadError.message;
+      errorEl.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Add product';
+      return;
+    }
+  }
+
+  const { error: insertError } = await sb.from('products').insert({
+    name,
+    variant: variant || null,
+    price_cents: Math.round(priceNzd * 100),
+    image_path: imagePath,
+    active: true
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Add product';
+
+  if (insertError) {
+    errorEl.textContent = insertError.message;
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('add-product-form').reset();
+  await loadProducts();
+});
+
+async function loadOrders() {
+  const { data: orders, error } = await sb
+    .from('orders')
+    .select('id, member_id, items, total_cents, status, reference, created_at')
+    .order('created_at', { ascending: false });
+
+  const { data: profiles } = await sb.from('profiles').select('id, full_name');
+  const nameById = {};
+  (profiles || []).forEach((p) => { nameById[p.id] = p.full_name; });
+
+  const listEl = document.getElementById('order-list');
+  if (error || !orders) {
+    listEl.innerHTML = '<p class="error-text">Could not load orders.</p>';
+    return;
+  }
+  if (orders.length === 0) {
+    listEl.innerHTML = '<p class="help-text">No orders yet.</p>';
+    return;
+  }
+
+  listEl.innerHTML = orders.map((o) => {
+    const itemsSummary = (o.items || []).map((it) => `${it.qty}× ${escapeHtml(it.name)}`).join(', ');
+    return `
+      <div class="card" style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:600; font-size:14px;">${escapeHtml(nameById[o.member_id] || 'Unknown member')} · ${money(o.total_cents)}</div>
+          <div class="help-text" style="margin-top:2px;">${itemsSummary} · ${formatDate(o.created_at)}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="badge ${o.status === 'paid' ? 'badge-approved' : 'badge-pending'}">${o.status === 'paid' ? 'Paid' : 'Invoice sent'}</span>
+          ${o.status !== 'paid' ? `<button type="button" class="btn btn-outline mark-paid" data-order-id="${o.id}">Mark paid</button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  document.querySelectorAll('.mark-paid').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-order-id');
+      await sb.from('orders').update({ status: 'paid' }).eq('id', id);
+      await loadOrders();
+    });
+  });
+}
+
+async function init() {
+  const { data: sessionData } = await sb.auth.getSession();
+  session = sessionData.session;
+
+  if (session) {
+    const { data } = await sb.from('profiles').select('role').eq('id', session.user.id).single();
+    isAdmin = !!(data && data.role === 'admin');
+  }
+
+  await loadProducts();
+
+  if (isAdmin) {
+    document.getElementById('admin-section').classList.remove('hidden');
+    await loadOrders();
+  }
+}
+
+init();
+</script>
+</body>
+</html>
