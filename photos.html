@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photos — Ōpanake 1C South 6B</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="header">
+<a href="index.html" class="logo">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V6"/><path d="M12 6c0-3 2.5-4.5 5-4.5-0.5 3-2.5 5-5 5"/><path d="M12 10c0-3 2.8-4.7 5.6-4.7-0.6 3.1-2.8 5.2-5.6 5.2"/><path d="M12 6c0-3-2.5-4.5-5-4.5 0.5 3 2.5 5 5 5"/><path d="M12 10c0-3-2.8-4.7-5.6-4.7 0.6 3.1 2.8 5.2 5.6 5.2"/></svg>
+Ōpanake 1C South 6B
+</a>
+<nav class="nav">
+<a href="index.html">Home</a>
+<a href="branches.html">Branches</a>
+<a href="whakapapa.html">Whakapapa</a>
+<a href="history.html">History</a>
+<a href="forum.html">Forum</a>
+<a href="archive.html">Archive</a>
+<a href="photos.html" class="active">Photos</a>
+<a href="register.html" class="pill" data-nav="login-pill">Register / Login</a>
+<a href="profile.html" class="avatar" data-nav="profile-icon">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+</a>
+</nav>
+</header>
+
+<main>
+<div class="hero" style="padding-bottom: 8px;">
+<div class="eyebrow">Photos</div>
+<h1 style="font-size: 32px; margin-top: 8px;">Whānau photo gallery</h1>
+<p>Shared by branch — visible to signed-in, approved members.</p>
+</div>
+
+<div class="container" style="padding-top: 12px; padding-bottom: 56px;">
+
+<div id="gated" class="card card-muted hidden" style="margin-bottom: 24px; text-align: center;">
+<p style="margin: 0;">Photos are visible to signed-in, approved members. <a href="register.html" style="color: var(--accent-dark); font-weight: 600;">Register or log in</a>.</p>
+</div>
+
+<form id="upload-form" class="card hidden" style="margin-bottom: 24px;">
+<h2 style="font-size: 16px; margin: 0 0 16px;">Add a photo</h2>
+<div class="field">
+<label for="ph-file">Photo</label>
+<input id="ph-file" type="file" accept="image/*" required>
+</div>
+<div class="field">
+<label for="ph-person">Who's in it</label>
+<input id="ph-person" type="text" required placeholder="e.g. Nan and the cousins, 1998">
+</div>
+<div class="field">
+<label for="ph-branch">Branch</label>
+<select id="ph-branch" required></select>
+</div>
+<div class="field">
+<label for="ph-caption">Caption (optional)</label>
+<input id="ph-caption" type="text">
+</div>
+<div id="ph-error" class="error-text hidden"></div>
+<button type="submit" id="ph-submit" class="btn">Upload</button>
+</form>
+
+<div id="gallery" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;">
+<div class="help-text">Loading photos…</div>
+</div>
+
+</div>
+</main>
+
+<footer class="footer">© Ōpanake 1C South 6B whānau trust</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-client.js"></script>
+<script>
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+
+let branchNameById = {};
+let session = null;
+
+async function renderGallery() {
+  const { data: photos, error } = await sb
+    .from('photos')
+    .select('id, branch_id, person_name, caption, storage_path, created_at')
+    .order('created_at', { ascending: false });
+
+  const gallery = document.getElementById('gallery');
+
+  if (error || !photos) {
+    document.getElementById('gated').classList.remove('hidden');
+    gallery.innerHTML = '';
+    return;
+  }
+
+  if (photos.length === 0) {
+    gallery.innerHTML = '<p class="help-text">No photos yet — be the first to add one.</p>';
+    return;
+  }
+
+  const cards = await Promise.all(photos.map(async (p) => {
+    const { data: signed } = await sb.storage.from('photos').createSignedUrl(p.storage_path, 3600);
+    const url = signed ? signed.signedUrl : '';
+    return `
+      <div class="card" style="padding: 0; overflow: hidden;">
+        ${url ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(p.person_name)}" style="width:100%; height:160px; object-fit:cover; display:block;">` : '<div style="height:160px; background: var(--surface-2);"></div>'}
+        <div style="padding: 14px;">
+          <div style="font-weight:600; font-size:13.5px;">${escapeHtml(p.person_name)}</div>
+          <div class="help-text" style="margin-top:2px;">${escapeHtml(branchNameById[p.branch_id] || '')}</div>
+          ${p.caption ? `<div style="font-size:13px; margin-top:6px;">${escapeHtml(p.caption)}</div>` : ''}
+        </div>
+      </div>`;
+  }));
+
+  gallery.innerHTML = cards.join('');
+}
+
+async function init() {
+  const { data: sessionData } = await sb.auth.getSession();
+  session = sessionData.session;
+
+  const { data: branches } = await sb.from('branches').select('id, name, sort_order').order('sort_order');
+  (branches || []).forEach((b) => { branchNameById[b.id] = b.name; });
+
+  if (session) {
+    const branchSelect = document.getElementById('ph-branch');
+    branchSelect.innerHTML = (branches || []).map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+    document.getElementById('upload-form').classList.remove('hidden');
+  }
+
+  await renderGallery();
+}
+
+document.getElementById('upload-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('ph-submit');
+  const errorEl = document.getElementById('ph-error');
+  errorEl.classList.add('hidden');
+
+  const fileInput = document.getElementById('ph-file');
+  const file = fileInput.files[0];
+  const personName = document.getElementById('ph-person').value.trim();
+  const branchId = document.getElementById('ph-branch').value;
+  const caption = document.getElementById('ph-caption').value.trim();
+
+  if (!file || !personName || !branchId) {
+    errorEl.textContent = 'Add a photo, who\'s in it, and a branch.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Uploading…';
+
+  const storagePath = `${session.user.id}/${Date.now()}-${file.name}`;
+  const { error: uploadError } = await sb.storage.from('photos').upload(storagePath, file);
+
+  if (uploadError) {
+    errorEl.textContent = uploadError.message;
+    errorEl.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Upload';
+    return;
+  }
+
+  const { error: insertError } = await sb.from('photos').insert({
+    uploaded_by: session.user.id,
+    branch_id: branchId,
+    person_name: personName,
+    caption: caption || null,
+    storage_path: storagePath
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Upload';
+
+  if (insertError) {
+    errorEl.textContent = insertError.message;
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('upload-form').reset();
+  await renderGallery();
+});
+
+init();
+</script>
+</body>
+</html>
