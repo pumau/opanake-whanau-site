@@ -54,6 +54,13 @@
 <p id="p-note" class="help-text" style="margin-top: 18px;"></p>
 </div>
 
+<div id="admin-approvals" class="hidden" style="margin-top: 32px;">
+<h2 style="font-size: 19px;">Pending members</h2>
+<div id="pending-list" style="display: flex; flex-direction: column; gap: 12px; margin-top: 14px;">
+<div class="help-text">Loading…</div>
+</div>
+</div>
+
 </div>
 </main>
 
@@ -112,7 +119,79 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
   window.location.href = 'index.html';
 });
 
-loadProfile();
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+
+function formatDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+async function renderPending() {
+  const { data: pending, error } = await sb
+    .from('profiles')
+    .select('id, full_name, joined_at, branches(name)')
+    .eq('status', 'pending')
+    .order('joined_at');
+
+  const listEl = document.getElementById('pending-list');
+
+  if (error) {
+    listEl.innerHTML = '<p class="error-text">Could not load pending members.</p>';
+    return;
+  }
+  if (!pending || pending.length === 0) {
+    listEl.innerHTML = '<p class="help-text">No one waiting on approval right now.</p>';
+    return;
+  }
+
+  listEl.innerHTML = pending.map((p) => `
+    <div class="card" style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;">
+      <div>
+        <div style="font-weight:600; font-size:14.5px;">${escapeHtml(p.full_name || 'Unnamed member')}</div>
+        <div class="help-text" style="margin-top:2px;">${escapeHtml((p.branches && p.branches.name) || 'No branch set')} · registered ${formatDate(p.joined_at)}</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn approve-btn" data-id="${p.id}">Approve</button>
+        <button type="button" class="btn btn-outline reject-btn" data-id="${p.id}">Reject</button>
+      </div>
+    </div>`).join('');
+
+  document.querySelectorAll('.approve-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      await sb.from('profiles').update({ status: 'approved' }).eq('id', btn.getAttribute('data-id'));
+      await renderPending();
+    });
+  });
+  document.querySelectorAll('.reject-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Reject this registration?')) return;
+      btn.disabled = true;
+      await sb.from('profiles').update({ status: 'rejected' }).eq('id', btn.getAttribute('data-id'));
+      await renderPending();
+    });
+  });
+}
+
+async function initAdmin(userId) {
+  const { data } = await sb.from('profiles').select('role').eq('id', userId).single();
+  if (data && data.role === 'admin') {
+    document.getElementById('admin-approvals').classList.remove('hidden');
+    await renderPending();
+  }
+}
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  await loadProfile();
+  if (session) await initAdmin(session.user.id);
+}
+
+init();
 </script>
 </body>
 </html>
