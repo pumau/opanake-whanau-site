@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forum — Ōpanake 1C South 6B</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="header">
+<a href="index.html" class="logo">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V6"/><path d="M12 6c0-3 2.5-4.5 5-4.5-0.5 3-2.5 5-5 5"/><path d="M12 10c0-3 2.8-4.7 5.6-4.7-0.6 3.1-2.8 5.2-5.6 5.2"/><path d="M12 6c0-3-2.5-4.5-5-4.5 0.5 3 2.5 5 5 5"/><path d="M12 10c0-3-2.8-4.7-5.6-4.7 0.6 3.1 2.8 5.2 5.6 5.2"/></svg>
+Ōpanake 1C South 6B
+</a>
+<nav class="nav">
+<a href="index.html">Home</a>
+<a href="branches.html">Branches</a>
+<a href="whakapapa.html">Whakapapa</a>
+<a href="history.html">History</a>
+<a href="forum.html" class="active">Forum</a>
+<a href="register.html" class="pill" data-nav="login-pill">Register / Login</a>
+<a href="profile.html" class="avatar" data-nav="profile-icon">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+</a>
+</nav>
+</header>
+
+<main>
+<div class="hero" style="padding-bottom: 8px;">
+<div class="eyebrow">Kōrero</div>
+<h1 style="font-size: 32px; margin-top: 8px;">Forum</h1>
+<p>Discussion, questions and updates across all nine branches.</p>
+</div>
+
+<div class="container" style="padding-top: 12px; padding-bottom: 56px;">
+
+<div id="new-topic-gate" class="card card-muted hidden" style="margin-bottom: 24px; text-align: center;">
+<p style="margin: 0;">Sign in as an approved member to start a new topic. <a href="register.html" style="color: var(--accent-dark); font-weight: 600;">Register or log in</a>.</p>
+</div>
+
+<form id="new-topic-form" class="card hidden" style="margin-bottom: 24px;">
+<h2 style="font-size: 17px; margin: 0 0 16px;">Start a new topic</h2>
+<div class="field">
+<label for="nt-category">Category</label>
+<select id="nt-category" required></select>
+</div>
+<div class="field">
+<label for="nt-title">Title</label>
+<input id="nt-title" type="text" required>
+</div>
+<div class="field">
+<label for="nt-body">First post</label>
+<textarea id="nt-body" required rows="4" style="font: inherit; font-size: 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); resize: vertical;"></textarea>
+</div>
+<div id="nt-error" class="error-text hidden"></div>
+<button type="submit" id="nt-submit" class="btn">Post topic</button>
+</form>
+
+<div id="categories" style="display: flex; flex-direction: column; gap: 28px;">
+<div class="help-text">Loading forum…</div>
+</div>
+
+</div>
+</main>
+
+<footer class="footer">© Ōpanake 1C South 6B whānau trust</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-client.js"></script>
+<script>
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+
+function formatDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+let session = null;
+let nameById = {};
+
+async function loadForum() {
+  const { data: sessionData } = await sb.auth.getSession();
+  session = sessionData.session;
+
+  const { data: directory } = session ? await sb.rpc('list_member_directory') : { data: null };
+  if (directory) directory.forEach((m) => { nameById[m.id] = m.full_name; });
+
+  const { data: categories, error: catError } = await sb
+    .from('forum_categories')
+    .select('id, name, description, sort_order')
+    .order('sort_order');
+
+  const { data: topics } = await sb
+    .from('forum_topics')
+    .select('id, category_id, title, author_id, created_at')
+    .order('created_at', { ascending: false });
+
+  const { data: allPosts } = await sb
+    .from('forum_posts')
+    .select('topic_id');
+
+  const postCounts = {};
+  (allPosts || []).forEach((p) => { postCounts[p.topic_id] = (postCounts[p.topic_id] || 0) + 1; });
+
+  const container = document.getElementById('categories');
+
+  if (catError || !categories) {
+    container.innerHTML = '<p class="error-text">Could not load the forum right now.</p>';
+    return;
+  }
+
+  container.innerHTML = categories.map((c) => {
+    const catTopics = (topics || []).filter((t) => t.category_id === c.id);
+    const topicsHtml = catTopics.length
+      ? catTopics.map((t) => `
+          <a href="topic.html?id=${encodeURIComponent(t.id)}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border); gap: 12px;">
+            <div>
+              <div style="font-weight:600; font-size:14.5px;">${escapeHtml(t.title)}</div>
+              <div class="help-text" style="margin-top:2px;">${escapeHtml(nameById[t.author_id] || 'A whānau member')} · ${formatDate(t.created_at)}</div>
+            </div>
+            <div class="help-text" style="flex-shrink:0;">${postCounts[t.id] || 1} post${(postCounts[t.id] || 1) === 1 ? '' : 's'}</div>
+          </a>`).join('')
+      : '<p class="help-text" style="padding: 8px 0;">No topics yet — be the first to post.</p>';
+
+    return `
+      <div class="card">
+        <h2 style="font-size: 18px; margin: 0;">${escapeHtml(c.name)}</h2>
+        ${c.description ? `<p class="help-text" style="margin-top:4px;">${escapeHtml(c.description)}</p>` : ''}
+        <div style="margin-top: 12px;">${topicsHtml}</div>
+      </div>`;
+  }).join('');
+
+  if (session) {
+    document.getElementById('new-topic-form').classList.remove('hidden');
+    const select = document.getElementById('nt-category');
+    select.innerHTML = categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  } else {
+    document.getElementById('new-topic-gate').classList.remove('hidden');
+  }
+}
+
+document.getElementById('new-topic-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('nt-submit');
+  const errorEl = document.getElementById('nt-error');
+  errorEl.classList.add('hidden');
+  btn.disabled = true;
+  btn.textContent = 'Posting…';
+
+  const categoryId = document.getElementById('nt-category').value;
+  const title = document.getElementById('nt-title').value.trim();
+  const body = document.getElementById('nt-body').value.trim();
+
+  const { data: topic, error: topicError } = await sb
+    .from('forum_topics')
+    .insert({ category_id: categoryId, author_id: session.user.id, title })
+    .select('id')
+    .single();
+
+  if (topicError || !topic) {
+    errorEl.textContent = (topicError && topicError.message) || "Couldn't post that topic — try again.";
+    errorEl.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Post topic';
+    return;
+  }
+
+  const { error: postError } = await sb
+    .from('forum_posts')
+    .insert({ topic_id: topic.id, author_id: session.user.id, body });
+
+  if (postError) {
+    errorEl.textContent = postError.message;
+    errorEl.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Post topic';
+    return;
+  }
+
+  window.location.href = `topic.html?id=${encodeURIComponent(topic.id)}`;
+});
+
+loadForum();
+</script>
+</body>
+</html>
