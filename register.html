@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Register — Ōpanake 1C South 6B</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="header">
+<a href="index.html" class="logo">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V6"/><path d="M12 6c0-3 2.5-4.5 5-4.5-0.5 3-2.5 5-5 5"/><path d="M12 10c0-3 2.8-4.7 5.6-4.7-0.6 3.1-2.8 5.2-5.6 5.2"/><path d="M12 6c0-3-2.5-4.5-5-4.5 0.5 3 2.5 5 5 5"/><path d="M12 10c0-3-2.8-4.7-5.6-4.7 0.6 3.1 2.8 5.2 5.6 5.2"/></svg>
+Ōpanake 1C South 6B
+</a>
+<nav class="nav">
+<a href="index.html">Home</a>
+<a href="register.html" class="active">Register</a>
+<a href="register.html" class="pill" data-nav="login-pill">Register / Login</a>
+<a href="profile.html" class="avatar" data-nav="profile-icon">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+</a>
+</nav>
+</header>
+
+<main>
+<div class="hero" style="padding-bottom: 0;">
+<div class="eyebrow">Join us</div>
+<h1 style="font-size: 32px; margin-top: 8px;">Register or log in</h1>
+</div>
+
+<div class="container" style="padding-top: 20px; padding-bottom: 56px; max-width: 560px;">
+
+<div class="tabs">
+<button type="button" id="tab-signup" class="active">Register</button>
+<button type="button" id="tab-login">Log in</button>
+</div>
+
+<form id="signup-form" class="card">
+<div class="field">
+<label for="su-name">Full name</label>
+<input id="su-name" type="text" required autocomplete="name">
+</div>
+<div class="field">
+<label for="su-branch">Branch</label>
+<select id="su-branch" required>
+<option value="">Loading branches…</option>
+</select>
+</div>
+<div class="field">
+<label for="su-email">Email</label>
+<input id="su-email" type="email" required autocomplete="email">
+</div>
+<div class="field">
+<label for="su-password">Password</label>
+<input id="su-password" type="password" required minlength="6" autocomplete="new-password">
+<span class="help-text">At least 6 characters.</span>
+</div>
+<div id="signup-error" class="error-text hidden"></div>
+<div id="signup-success" class="hidden" style="background: var(--river-soft); border: 1px solid var(--river); border-radius: 10px; padding: 14px 16px; font-size: 13.5px; margin-bottom: 16px;"></div>
+<button type="submit" id="signup-btn" class="btn">Create my account</button>
+<p class="help-text" style="margin-top: 14px;">An admin approves new accounts before you get full access to the members' area — you'll be able to see your status on your profile page once you're signed in.</p>
+</form>
+
+<form id="login-form" class="card hidden">
+<div class="field">
+<label for="li-email">Email</label>
+<input id="li-email" type="email" required autocomplete="email">
+</div>
+<div class="field">
+<label for="li-password">Password</label>
+<input id="li-password" type="password" required autocomplete="current-password">
+</div>
+<div id="login-error" class="error-text hidden"></div>
+<button type="submit" id="login-btn" class="btn btn-dark">Log in</button>
+</form>
+
+</div>
+</main>
+
+<footer class="footer">© Ōpanake 1C South 6B whānau trust</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-client.js"></script>
+<script>
+const tabSignup = document.getElementById('tab-signup');
+const tabLogin = document.getElementById('tab-login');
+const signupForm = document.getElementById('signup-form');
+const loginForm = document.getElementById('login-form');
+
+tabSignup.addEventListener('click', () => {
+  tabSignup.classList.add('active');
+  tabLogin.classList.remove('active');
+  signupForm.classList.remove('hidden');
+  loginForm.classList.add('hidden');
+});
+tabLogin.addEventListener('click', () => {
+  tabLogin.classList.add('active');
+  tabSignup.classList.remove('active');
+  loginForm.classList.remove('hidden');
+  signupForm.classList.add('hidden');
+});
+
+async function loadBranches() {
+  const select = document.getElementById('su-branch');
+  const { data, error } = await sb.from('branches').select('id, name').order('sort_order');
+  if (error || !data || data.length === 0) {
+    select.innerHTML = '<option value="">Branches aren\'t set up yet — check back soon</option>';
+    return;
+  }
+  select.innerHTML = '<option value="">Choose your branch…</option>' +
+    data.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+signupForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('signup-btn');
+  const errorEl = document.getElementById('signup-error');
+  const successEl = document.getElementById('signup-success');
+  errorEl.classList.add('hidden');
+  successEl.classList.add('hidden');
+  btn.disabled = true;
+  btn.textContent = 'Creating your account…';
+
+  const fullName = document.getElementById('su-name').value.trim();
+  const branchId = document.getElementById('su-branch').value;
+  const email = document.getElementById('su-email').value.trim();
+  const password = document.getElementById('su-password').value;
+
+  const { data, error } = await sb.auth.signUp({
+    email,
+    password,
+    options: { data: { full_name: fullName, branch_id: branchId || null } }
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Create my account';
+
+  if (error) {
+    errorEl.textContent = error.message;
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  signupForm.reset();
+  successEl.textContent = data.session
+    ? "You're in! Redirecting you to your profile…"
+    : 'Almost there — check your email to confirm your account, then log in.';
+  successEl.classList.remove('hidden');
+
+  if (data.session) {
+    setTimeout(() => { window.location.href = 'profile.html'; }, 1200);
+  }
+});
+
+loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const errorEl = document.getElementById('login-error');
+  errorEl.classList.add('hidden');
+  btn.disabled = true;
+  btn.textContent = 'Logging in…';
+
+  const email = document.getElementById('li-email').value.trim();
+  const password = document.getElementById('li-password').value;
+
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+
+  btn.disabled = false;
+  btn.textContent = 'Log in';
+
+  if (error) {
+    errorEl.textContent = error.message;
+    errorEl.classList.remove('hidden');
+    return;
+  }
+  window.location.href = 'profile.html';
+});
+
+loadBranches();
+</script>
+</body>
+</html>
