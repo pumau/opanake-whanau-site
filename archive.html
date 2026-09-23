@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archive — Ōpanake 1C South 6B</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="header">
+<a href="index.html" class="logo">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V6"/><path d="M12 6c0-3 2.5-4.5 5-4.5-0.5 3-2.5 5-5 5"/><path d="M12 10c0-3 2.8-4.7 5.6-4.7-0.6 3.1-2.8 5.2-5.6 5.2"/><path d="M12 6c0-3-2.5-4.5-5-4.5 0.5 3 2.5 5 5 5"/><path d="M12 10c0-3-2.8-4.7-5.6-4.7 0.6 3.1 2.8 5.2 5.6 5.2"/></svg>
+Ōpanake 1C South 6B
+</a>
+<nav class="nav">
+<a href="index.html">Home</a>
+<a href="branches.html">Branches</a>
+<a href="whakapapa.html">Whakapapa</a>
+<a href="history.html">History</a>
+<a href="forum.html">Forum</a>
+<a href="archive.html" class="active">Archive</a>
+<a href="register.html" class="pill" data-nav="login-pill">Register / Login</a>
+<a href="profile.html" class="avatar" data-nav="profile-icon">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+</a>
+</nav>
+</header>
+
+<main>
+<div class="hero" style="padding-bottom: 8px;">
+<div class="eyebrow">Archive</div>
+<h1 style="font-size: 32px; margin-top: 8px;">Meeting minutes &amp; Māori Land Court records</h1>
+<p>Shared documents for the whānau trust — visible to signed-in, approved members.</p>
+</div>
+
+<div class="container" style="padding-top: 12px; padding-bottom: 56px;">
+
+<div id="gated" class="card card-muted hidden" style="margin-bottom: 24px; text-align: center;">
+<p style="margin: 0;">The archive is visible to signed-in, approved members. <a href="register.html" style="color: var(--accent-dark); font-weight: 600;">Register or log in</a>.</p>
+</div>
+
+<div id="admin-upload" class="card hidden" style="margin-bottom: 24px;">
+<h2 style="font-size: 16px; margin: 0 0 16px;">Upload a document</h2>
+<div class="field">
+<label for="up-title">Title</label>
+<input id="up-title" type="text" required>
+</div>
+<div class="field">
+<label for="up-category">Category</label>
+<select id="up-category">
+<option value="minutes">Meeting minutes</option>
+<option value="land_court">Māori Land Court record</option>
+</select>
+</div>
+<div class="field">
+<label for="up-file">File</label>
+<input id="up-file" type="file" required>
+</div>
+<div id="up-error" class="error-text hidden"></div>
+<button type="button" id="up-submit" class="btn">Upload</button>
+</div>
+
+<div id="file-list" style="display: flex; flex-direction: column; gap: 12px;">
+<div class="help-text">Loading archive…</div>
+</div>
+
+</div>
+</main>
+
+<footer class="footer">© Ōpanake 1C South 6B whānau trust</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-client.js"></script>
+<script>
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+
+function formatDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+const categoryLabels = { minutes: 'Meeting minutes', land_court: 'Māori Land Court record' };
+let isAdmin = false;
+
+async function checkAdmin(userId) {
+  const { data } = await sb.from('profiles').select('role').eq('id', userId).single();
+  return !!(data && data.role === 'admin');
+}
+
+async function renderFiles() {
+  const { data: files, error } = await sb
+    .from('archive_files')
+    .select('id, title, category, storage_path, uploaded_at')
+    .order('uploaded_at', { ascending: false });
+
+  const listEl = document.getElementById('file-list');
+
+  if (error || !files) {
+    document.getElementById('gated').classList.remove('hidden');
+    listEl.innerHTML = '';
+    return;
+  }
+
+  if (files.length === 0) {
+    listEl.innerHTML = '<p class="help-text">No documents uploaded yet.</p>';
+    return;
+  }
+
+  listEl.innerHTML = files.map((f) => `
+    <div class="card" style="display:flex; justify-content:space-between; align-items:center; gap: 16px; flex-wrap: wrap;">
+      <div>
+        <div style="font-weight:600; font-size:14.5px;">${escapeHtml(f.title)}</div>
+        <div class="help-text" style="margin-top:2px;">${categoryLabels[f.category] || f.category} · uploaded ${formatDate(f.uploaded_at)}</div>
+      </div>
+      <a data-path="${escapeHtml(f.storage_path)}" class="btn btn-outline download-link" href="#">Download</a>
+    </div>`).join('');
+
+  document.querySelectorAll('.download-link').forEach((link) => {
+    link.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const path = link.getAttribute('data-path');
+      const { data, error: signError } = await sb.storage.from('archive').createSignedUrl(path, 300);
+      if (signError || !data) {
+        alert("Couldn't get that file right now.");
+        return;
+      }
+      window.open(data.signedUrl, '_blank');
+    });
+  });
+}
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    isAdmin = await checkAdmin(session.user.id);
+    if (isAdmin) document.getElementById('admin-upload').classList.remove('hidden');
+  }
+  await renderFiles();
+}
+
+document.getElementById('up-submit').addEventListener('click', async () => {
+  const btn = document.getElementById('up-submit');
+  const errorEl = document.getElementById('up-error');
+  errorEl.classList.add('hidden');
+
+  const title = document.getElementById('up-title').value.trim();
+  const category = document.getElementById('up-category').value;
+  const fileInput = document.getElementById('up-file');
+  const file = fileInput.files[0];
+
+  if (!title || !file) {
+    errorEl.textContent = 'Add a title and choose a file first.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Uploading…';
+
+  const storagePath = `${category}/${Date.now()}-${file.name}`;
+  const { error: uploadError } = await sb.storage.from('archive').upload(storagePath, file);
+
+  if (uploadError) {
+    errorEl.textContent = uploadError.message;
+    errorEl.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Upload';
+    return;
+  }
+
+  const { data: { session } } = await sb.auth.getSession();
+  const { error: insertError } = await sb.from('archive_files').insert({
+    title,
+    category,
+    storage_path: storagePath,
+    uploaded_by: session.user.id
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Upload';
+
+  if (insertError) {
+    errorEl.textContent = insertError.message;
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('up-title').value = '';
+  fileInput.value = '';
+  await renderFiles();
+});
+
+init();
+</script>
+</body>
+</html>
