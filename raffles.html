@@ -15,7 +15,6 @@
 </a>
 <nav class="nav">
 <a href="index.html">Home</a>
-<a href="branches.html">Branches</a>
 <a href="whakapapa.html">Whakapapa</a>
 <a href="history.html">History</a>
 <a href="events.html">Events</a>
@@ -49,14 +48,14 @@
 
 <div id="page-content" class="hidden">
 <div class="container" style="padding-top: 12px; padding-bottom: 40px;">
-<div id="raffle-list" style="display: flex; flex-direction: column; gap: 20px;">
+<div id="raffle-list" style="display: flex; flex-direction: column; gap: 24px;">
 <div class="help-text">Loading raffles…</div>
 </div>
 </div>
 
 <div id="admin-section" class="container hidden" style="padding-bottom: 56px;">
 <h2 style="font-size: 20px;">Raffle admin</h2>
-<form id="add-raffle-form" class="card" style="margin-top: 16px;">
+<form id="add-raffle-form" class="card" style="margin-top: 16px; max-width: 640px;">
 <h3 style="font-size: 15px; margin: 0 0 14px;">Add a raffle</h3>
 <div class="field">
 <label for="nr-title">Title</label>
@@ -105,12 +104,18 @@ function formatDate(d) {
 
 let session = null;
 let isAdmin = false;
+let nameById = {};
+let approvedMembers = [];
+let ticketsExtended = true; // false until database update #8 has been run
+const openManage = new Set();
+
+const statusLabels = { open: 'Open', closed: 'Entries closed', drawn: 'Drawn' };
+const GUEST = '__guest__';
 
 // Uploads a prize photo to the private "raffles" bucket and returns its
 // storage path, or null (after alerting) if the upload failed.
 async function uploadRaffleImage(file) {
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const path = `${Date.now()}-${safeName}`;
+  const path = `${Date.now()}-${safeFileName(file.name)}`;
   const { error } = await sb.storage.from('raffles').upload(path, file);
   if (error) {
     alert("Couldn't upload the photo — " + error.message);
@@ -119,7 +124,152 @@ async function uploadRaffleImage(file) {
   return path;
 }
 
-const statusLabels = { open: 'Open', closed: 'Entries closed', drawn: 'Drawn' };
+function holderName(e) {
+  if (e.member_id) return nameById[e.member_id] || 'Member';
+  return (e.guest_name || 'Guest').trim();
+}
+
+function paidBadge(paid) {
+  return paid
+    ? '<span class="badge badge-approved">Paid</span>'
+    : '<span class="badge badge-pending">Awaiting payment</span>';
+}
+
+function sumQty(entries) { return entries.reduce((n, e) => n + (e.quantity || 0), 0); }
+
+// ---- The member's own tickets (left column) --------------------------------
+
+function myTicketsHtml(r, mine) {
+  if (mine.length === 0) {
+    return '<div class="card-muted" style="border-radius:12px; padding:16px 18px; margin-top:16px;"><div style="font-weight:600; font-size:14px;">Your tickets</div><p class="help-text" style="margin-top:4px;">You don\'t have any tickets in this raffle yet.</p></div>';
+  }
+  const qty = sumQty(mine);
+  const owed = mine.filter((e) => !e.paid).reduce((n, e) => n + e.quantity * r.ticket_price_cents, 0);
+  const rows = mine.map((e) => `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--border); font-size:13.5px; flex-wrap:wrap;">
+      <span>${e.quantity} ticket${e.quantity === 1 ? '' : 's'} · ${money(e.quantity * r.ticket_price_cents)} <span class="help-text">· ${formatDate(e.created_at)}</span></span>
+      ${ticketsExtended ? paidBadge(e.paid) : ''}
+    </div>`).join('');
+  return `
+    <div class="card-muted" style="border-radius:12px; padding:16px 18px; margin-top:16px;">
+      <div style="font-weight:600; font-size:14px;">Your tickets: ${qty} · ${money(qty * r.ticket_price_cents)}</div>
+      ${ticketsExtended && owed > 0 ? `<p class="help-text" style="margin-top:2px;">${money(owed)} still to pay</p>` : ''}
+      <div style="margin-top:8px;">${rows}</div>
+    </div>`;
+}
+
+// ---- Get tickets (right column) --------------------------------------------
+
+function getTicketsHtml(r) {
+  if (r.status === 'open') {
+    return `
+      <div class="card-muted" style="border-radius:14px; padding:20px;">
+        <h3 style="font-size:16px; margin:0 0 4px;">Get tickets</h3>
+        <p class="help-text" style="margin-bottom:14px;">${money(r.ticket_price_cents)} per ticket. We'll follow up with an invoice.</p>
+        <div class="field" style="margin-bottom:10px;">
+          <label for="qty-${r.id}">How many?</label>
+          <input type="number" min="1" value="1" id="qty-${r.id}" class="qty-input" data-price="${r.ticket_price_cents}" data-raffle-id="${r.id}">
+        </div>
+        <div class="help-text" style="margin-bottom:14px;">Total: <strong id="total-${r.id}">${money(r.ticket_price_cents)}</strong></div>
+        <button type="button" class="btn" data-action="buy" data-raffle-id="${r.id}" style="width:100%; justify-content:center;">Get tickets</button>
+      </div>`;
+  }
+  return `
+    <div class="card-muted" style="border-radius:14px; padding:20px;">
+      <h3 style="font-size:16px; margin:0 0 4px;">${r.status === 'drawn' ? 'This raffle has been drawn' : 'Entries are closed'}</h3>
+      <p class="help-text">${r.status === 'drawn' ? 'Thanks to everyone who took part.' : 'The draw is coming up.'}</p>
+    </div>`;
+}
+
+// ---- Admin management console ------------------------------------------------
+
+function adminConsoleHtml(r, rEntries) {
+  const price = r.ticket_price_cents;
+  const totalQty = sumQty(rEntries);
+  const paidQty = sumQty(rEntries.filter((e) => e.paid));
+  const owedQty = totalQty - paidQty;
+
+  // Group by person (registered member, or guest by name)
+  const people = {};
+  rEntries.forEach((e) => {
+    const key = e.member_id ? e.member_id : 'g:' + (e.guest_name || '').trim().toLowerCase();
+    if (!people[key]) people[key] = { name: holderName(e), guest: !e.member_id, qty: 0, paidQty: 0 };
+    people[key].qty += e.quantity;
+    if (e.paid) people[key].paidQty += e.quantity;
+  });
+  const peopleRows = Object.values(people)
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((p) => {
+      const state = p.paidQty >= p.qty ? 'Paid' : (p.paidQty > 0 ? 'Part paid' : 'Unpaid');
+      const cls = p.paidQty >= p.qty ? 'badge-approved' : 'badge-pending';
+      return `<tr>
+        <td style="padding:8px 8px 8px 0;">${escapeHtml(p.name)}${p.guest ? ' <span class="help-text">(guest)</span>' : ''}</td>
+        <td style="padding:8px;">${p.qty}</td>
+        <td style="padding:8px;">${money(p.qty * price)}</td>
+        <td style="padding:8px;">${money((p.qty - p.paidQty) * price)}</td>
+        <td style="padding:8px 0 8px 8px;"><span class="badge ${cls}">${state}</span></td>
+      </tr>`;
+    }).join('');
+
+  const entryRows = rEntries.map((e) => `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; padding:9px 0; border-top:1px solid var(--border); flex-wrap:wrap; font-size:13.5px;">
+      <div><strong>${escapeHtml(holderName(e))}</strong>${e.member_id ? '' : ' <span class="help-text">(guest)</span>'} · ${e.quantity} ticket${e.quantity === 1 ? '' : 's'} · ${money(e.quantity * price)} <span class="help-text">· ${formatDate(e.created_at)}</span></div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        ${ticketsExtended ? `<label class="help-text" style="display:flex; align-items:center; gap:6px;"><input type="checkbox" data-action="toggle-paid" data-entry-id="${e.id}" ${e.paid ? 'checked' : ''}> Paid</label>` : ''}
+        <button type="button" class="btn btn-outline" data-action="delete-entry" data-entry-id="${e.id}" style="padding:5px 10px; font-size:12px;">Remove</button>
+      </div>
+    </div>`).join('');
+
+  const memberOptions = approvedMembers
+    .map((m) => `<option value="${m.id}">${escapeHtml(m.full_name || 'Unnamed member')}</option>`).join('');
+
+  return `
+    <details data-manage="${r.id}" ${openManage.has(r.id) ? 'open' : ''} style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border);">
+      <summary style="cursor:pointer; font-weight:600; font-size:14.5px;">Manage tickets · ${totalQty} sold · ${money(paidQty * price)} paid · ${money(owedQty * price)} outstanding</summary>
+
+      ${ticketsExtended ? '' : '<p class="error-text" style="margin-top:10px;">Paid tracking and guest tickets need database update #8 to be run in Supabase first.</p>'}
+
+      <div style="margin-top:16px;">
+        <div style="font-weight:600; font-size:13.5px; margin-bottom:6px;">Who has tickets</div>
+        ${peopleRows ? `
+          <div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:13.5px;">
+            <thead><tr class="help-text" style="text-align:left;"><th style="padding:6px 8px 6px 0;">Name</th><th style="padding:6px 8px;">Tickets</th><th style="padding:6px 8px;">Value</th><th style="padding:6px 8px;">Owing</th><th style="padding:6px 0 6px 8px;">Status</th></tr></thead>
+            <tbody>${peopleRows}</tbody>
+          </table></div>` : '<p class="help-text">Nobody has tickets yet.</p>'}
+      </div>
+
+      <div style="margin-top:20px;">
+        <div style="font-weight:600; font-size:13.5px; margin-bottom:2px;">Every ticket entry</div>
+        ${entryRows || '<p class="help-text">No entries yet.</p>'}
+      </div>
+
+      <div class="card-muted" style="border-radius:12px; padding:16px 18px; margin-top:20px;">
+        <div style="font-weight:600; font-size:13.5px; margin-bottom:10px;">Add tickets for someone</div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+          <div class="field" style="margin:0; min-width:180px;">
+            <label for="addholder-${r.id}">Who</label>
+            <select id="addholder-${r.id}" data-action="holder-select" data-raffle-id="${r.id}">
+              <option value="">Choose a member…</option>
+              ${memberOptions}
+              <option value="${GUEST}">Guest (not registered)…</option>
+            </select>
+          </div>
+          <div class="field hidden" id="guestfield-${r.id}" style="margin:0; min-width:180px;">
+            <label for="guestname-${r.id}">Guest's name</label>
+            <input type="text" id="guestname-${r.id}">
+          </div>
+          <div class="field" style="margin:0; width:90px;">
+            <label for="addqty-${r.id}">Tickets</label>
+            <input type="number" min="1" value="1" id="addqty-${r.id}">
+          </div>
+          <label class="help-text" style="display:flex; align-items:center; gap:6px; padding-bottom:12px;"><input type="checkbox" id="addpaid-${r.id}"> Already paid</label>
+          <button type="button" class="btn" data-action="add-entry" data-raffle-id="${r.id}" style="margin-bottom:12px;">Add tickets</button>
+        </div>
+      </div>
+    </details>`;
+}
+
+// ---- Render -------------------------------------------------------------------
 
 async function renderRaffles() {
   const { data: raffles, error } = await sb
@@ -141,11 +291,20 @@ async function renderRaffles() {
   const totalsById = {};
   (totals || []).forEach((t) => { totalsById[t.raffle_id] = t; });
 
-  let myEntries = {};
-  if (session) {
-    const { data: entries } = await sb.from('raffle_entries').select('raffle_id, quantity').eq('member_id', session.user.id);
-    (entries || []).forEach((e) => { myEntries[e.raffle_id] = (myEntries[e.raffle_id] || 0) + e.quantity; });
+  // Admins get every entry back; members only ever get their own (database rule).
+  let entries = [];
+  let res = await sb.from('raffle_entries')
+    .select('id, raffle_id, member_id, guest_name, quantity, paid, created_at')
+    .order('created_at');
+  if (res.error) {
+    ticketsExtended = false;
+    res = await sb.from('raffle_entries')
+      .select('id, raffle_id, member_id, quantity, created_at')
+      .order('created_at');
+  } else {
+    ticketsExtended = true;
   }
+  entries = res.data || [];
 
   const imageUrls = {};
   await Promise.all(raffles.filter((r) => r.image_path).map(async (r) => {
@@ -155,123 +314,197 @@ async function renderRaffles() {
 
   listEl.innerHTML = raffles.map((r) => {
     const t = totalsById[r.id] || { total_tickets: 0, total_entrants: 0 };
-    const mine = myEntries[r.id] || 0;
+    const rEntries = entries.filter((e) => e.raffle_id === r.id);
+    const mine = rEntries.filter((e) => e.member_id === session.user.id);
+
     return `
-      <div class="card">
-        ${imageUrls[r.id] ? `<img src="${escapeHtml(imageUrls[r.id])}" alt="Prize: ${escapeHtml(r.title)}" style="width:100%; max-height:320px; object-fit:cover; border-radius:10px; display:block; margin-bottom:16px;">` : ''}
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
-          <div>
-            <div style="display:flex; align-items:center; gap:10px;">
-              <h2 style="font-size:18px; margin:0;">${escapeHtml(r.title)}</h2>
+      <div class="card" data-raffle-card="${r.id}">
+        <div class="two-col" style="grid-template-columns: minmax(0, 1fr) 300px;">
+          <div class="col-main">
+            ${imageUrls[r.id] ? `<img src="${escapeHtml(imageUrls[r.id])}" alt="Prize: ${escapeHtml(r.title)}" style="width:100%; max-height:320px; object-fit:cover; border-radius:10px; display:block; margin-bottom:16px;">` : ''}
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <h2 style="font-size:20px; margin:0;">${escapeHtml(r.title)}</h2>
               <span class="badge ${r.status === 'drawn' ? 'badge-approved' : 'badge-pending'}">${statusLabels[r.status] || r.status}</span>
             </div>
-            ${r.description ? `<p class="help-text" style="margin-top:6px;">${escapeHtml(r.description)}</p>` : ''}
+            ${r.description ? `<p style="margin-top:8px; font-size:14px;">${escapeHtml(r.description)}</p>` : ''}
             <p class="help-text" style="margin-top:6px;">${money(r.ticket_price_cents)} per ticket${r.draw_date ? ' · drawn ' + formatDate(r.draw_date) : ''} · ${t.total_tickets || 0} ticket${(t.total_tickets || 0) === 1 ? '' : 's'} sold</p>
             ${r.status === 'drawn' && r.winner_name ? `<p style="margin-top:8px; font-weight:600; color: var(--accent-dark);">Winner: ${escapeHtml(r.winner_name)}</p>` : ''}
-            ${mine > 0 ? `<p class="help-text" style="margin-top:6px;">You have ${mine} ticket${mine === 1 ? '' : 's'} in this raffle.</p>` : ''}
+            ${myTicketsHtml(r, mine)}
           </div>
-          ${session && r.status === 'open' ? `
-            <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-              <input type="number" min="1" value="1" id="qty-${r.id}" style="width:64px; font:inherit; font-size:13px; padding:8px; border:1px solid var(--border); border-radius:6px; background:var(--bg);">
-              <button type="button" class="btn buy-tickets" data-raffle-id="${r.id}" data-price="${r.ticket_price_cents}">Get tickets</button>
-            </div>` : ''}
+          <div class="col-side" style="position: static;">
+            ${getTicketsHtml(r)}
+          </div>
         </div>
         ${isAdmin ? `
-          <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            ${r.status === 'open' ? `<button type="button" class="btn btn-outline close-raffle" data-raffle-id="${r.id}">Close entries</button>` : ''}
-            ${r.status === 'closed' ? `<button type="button" class="btn draw-raffle" data-raffle-id="${r.id}">Draw winner</button>` : ''}
+          <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border); display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            ${r.status === 'open' ? `<button type="button" class="btn btn-outline" data-action="close-raffle" data-raffle-id="${r.id}">Close entries</button>` : ''}
+            ${r.status === 'closed' ? `<button type="button" class="btn" data-action="draw-raffle" data-raffle-id="${r.id}">Draw winner</button>` : ''}
             <label class="help-text" style="display:flex; align-items:center; gap:8px; margin-left:auto;">${r.image_path ? 'Change photo' : 'Add photo'}
-              <input type="file" accept="image/*" class="raffle-image-input" data-raffle-id="${r.id}" data-old-path="${escapeHtml(r.image_path || '')}" style="font-size:12px; max-width:200px;">
+              <input type="file" accept="image/*" data-action="raffle-image" data-raffle-id="${r.id}" data-old-path="${escapeHtml(r.image_path || '')}" style="font-size:12px; max-width:200px;">
             </label>
-          </div>` : ''}
+          </div>
+          ${adminConsoleHtml(r, rEntries)}` : ''}
       </div>`;
   }).join('');
+}
 
-  document.querySelectorAll('.buy-tickets').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const raffleId = btn.getAttribute('data-raffle-id');
-      const qtyInput = document.getElementById(`qty-${raffleId}`);
-      const qty = parseInt(qtyInput.value, 10) || 0;
-      if (qty < 1) return;
-      btn.disabled = true;
-      btn.textContent = 'Adding…';
-      const { error: insertError } = await sb.from('raffle_entries').insert({ raffle_id: raffleId, member_id: session.user.id, quantity: qty });
+// ---- Actions (one set of delegated listeners, so re-rendering is safe) ---------
+
+const listEl = document.getElementById('raffle-list');
+
+listEl.addEventListener('toggle', (e) => {
+  const raffleId = e.target.getAttribute && e.target.getAttribute('data-manage');
+  if (!raffleId) return;
+  if (e.target.open) openManage.add(raffleId); else openManage.delete(raffleId);
+}, true);
+
+listEl.addEventListener('input', (e) => {
+  if (!e.target.classList.contains('qty-input')) return;
+  const qty = Math.max(parseInt(e.target.value, 10) || 0, 0);
+  const totalEl = document.getElementById('total-' + e.target.getAttribute('data-raffle-id'));
+  if (totalEl) totalEl.textContent = money(qty * parseInt(e.target.getAttribute('data-price'), 10));
+});
+
+listEl.addEventListener('change', async (e) => {
+  const action = e.target.getAttribute('data-action');
+
+  if (action === 'holder-select') {
+    const raffleId = e.target.getAttribute('data-raffle-id');
+    document.getElementById('guestfield-' + raffleId).classList.toggle('hidden', e.target.value !== GUEST);
+    return;
+  }
+
+  if (action === 'toggle-paid') {
+    const paid = e.target.checked;
+    const { error } = await sb.from('raffle_entries')
+      .update({ paid, paid_at: paid ? new Date().toISOString() : null })
+      .eq('id', e.target.getAttribute('data-entry-id'));
+    if (error) alert("Couldn't update that — " + error.message);
+    await renderRaffles();
+    return;
+  }
+
+  if (action === 'raffle-image') {
+    const input = e.target;
+    const file = input.files[0];
+    if (!file) return;
+    const raffleId = input.getAttribute('data-raffle-id');
+    const oldPath = input.getAttribute('data-old-path');
+    input.disabled = true;
+    const path = await uploadRaffleImage(file);
+    if (!path) { input.disabled = false; return; }
+    const { error: updateError } = await sb.from('raffles').update({ image_path: path }).eq('id', raffleId);
+    if (updateError) {
+      alert("Couldn't save the photo — " + updateError.message);
+      input.disabled = false;
+      return;
+    }
+    if (oldPath) await sb.storage.from('raffles').remove([oldPath]);
+    await renderRaffles();
+  }
+});
+
+listEl.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const action = btn.getAttribute('data-action');
+  const raffleId = btn.getAttribute('data-raffle-id');
+
+  if (action === 'buy') {
+    const qty = parseInt(document.getElementById('qty-' + raffleId).value, 10) || 0;
+    if (qty < 1) return;
+    btn.disabled = true;
+    btn.textContent = 'Adding…';
+    const { error } = await sb.from('raffle_entries').insert({ raffle_id: raffleId, member_id: session.user.id, quantity: qty });
+    if (error) {
+      alert(error.message);
       btn.disabled = false;
       btn.textContent = 'Get tickets';
-      if (insertError) {
-        alert(insertError.message);
-        return;
-      }
-      await renderRaffles();
-    });
-  });
+      return;
+    }
+    await renderRaffles();
+    return;
+  }
 
-  document.querySelectorAll('.raffle-image-input').forEach((input) => {
-    input.addEventListener('change', async () => {
-      const file = input.files[0];
-      if (!file) return;
-      const raffleId = input.getAttribute('data-raffle-id');
-      const oldPath = input.getAttribute('data-old-path');
-      input.disabled = true;
-      const path = await uploadRaffleImage(file);
-      if (!path) { input.disabled = false; return; }
-      const { error: updateError } = await sb.from('raffles').update({ image_path: path }).eq('id', raffleId);
-      if (updateError) {
-        alert("Couldn't save the photo — " + updateError.message);
-        input.disabled = false;
-        return;
-      }
-      if (oldPath) await sb.storage.from('raffles').remove([oldPath]);
-      await renderRaffles();
-    });
-  });
+  if (action === 'add-entry') {
+    const holder = document.getElementById('addholder-' + raffleId).value;
+    const guestName = document.getElementById('guestname-' + raffleId).value.trim();
+    const qty = parseInt(document.getElementById('addqty-' + raffleId).value, 10) || 0;
+    const paid = document.getElementById('addpaid-' + raffleId).checked;
 
-  document.querySelectorAll('.close-raffle').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      await sb.from('raffles').update({ status: 'closed' }).eq('id', btn.getAttribute('data-raffle-id'));
-      await renderRaffles();
-    });
-  });
+    if (!holder) { alert('Choose a member, or choose Guest and type their name.'); return; }
+    if (holder === GUEST && !guestName) { alert("Type the guest's name."); return; }
+    if (qty < 1) { alert('Enter at least 1 ticket.'); return; }
 
-  document.querySelectorAll('.draw-raffle').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const raffleId = btn.getAttribute('data-raffle-id');
-      if (!confirm('Draw a winner for this raffle now? This cannot be undone.')) return;
-      btn.disabled = true;
-      btn.textContent = 'Drawing…';
+    const row = { raffle_id: raffleId, quantity: qty };
+    if (holder === GUEST) row.guest_name = guestName; else row.member_id = holder;
+    if (ticketsExtended) {
+      row.paid = paid;
+      row.paid_at = paid ? new Date().toISOString() : null;
+      row.added_by = session.user.id;
+    }
 
-      const { data: entries, error: entriesError } = await sb
-        .from('raffle_entries')
-        .select('id, member_id, quantity')
-        .eq('raffle_id', raffleId);
-
-      if (entriesError || !entries || entries.length === 0) {
-        alert('No entries to draw from.');
-        btn.disabled = false;
-        btn.textContent = 'Draw winner';
-        return;
-      }
-
-      const weighted = [];
-      entries.forEach((e) => { for (let i = 0; i < e.quantity; i++) weighted.push(e); });
-      const winnerEntry = weighted[Math.floor(Math.random() * weighted.length)];
-
-      const { data: profiles } = await sb.from('profiles').select('id, full_name');
-      const nameById = {};
-      (profiles || []).forEach((p) => { nameById[p.id] = p.full_name; });
-      const winnerName = nameById[winnerEntry.member_id] || 'Unknown member';
-
-      await sb.from('raffles').update({
-        status: 'drawn',
-        winner_entry_id: winnerEntry.id,
-        winner_name: winnerName
-      }).eq('id', raffleId);
-
+    btn.disabled = true;
+    const { error } = await sb.from('raffle_entries').insert(row);
+    if (error) {
+      alert(holder === GUEST && !ticketsExtended
+        ? 'Guest tickets need database update #8 to be run in Supabase first.'
+        : "Couldn't add those tickets — " + error.message);
       btn.disabled = false;
-      await renderRaffles();
-    });
-  });
-}
+      return;
+    }
+    openManage.add(raffleId);
+    await renderRaffles();
+    return;
+  }
+
+  if (action === 'delete-entry') {
+    if (!confirm('Remove this ticket entry?')) return;
+    btn.disabled = true;
+    const { error } = await sb.from('raffle_entries').delete().eq('id', btn.getAttribute('data-entry-id'));
+    if (error) alert("Couldn't remove that — " + error.message);
+    await renderRaffles();
+    return;
+  }
+
+  if (action === 'close-raffle') {
+    await sb.from('raffles').update({ status: 'closed' }).eq('id', raffleId);
+    await renderRaffles();
+    return;
+  }
+
+  if (action === 'draw-raffle') {
+    const { data: entries, error: entriesError } = await sb
+      .from('raffle_entries')
+      .select(ticketsExtended ? 'id, member_id, guest_name, quantity, paid' : 'id, member_id, quantity')
+      .eq('raffle_id', raffleId);
+
+    if (entriesError || !entries || entries.length === 0) {
+      alert('No entries to draw from.');
+      return;
+    }
+
+    const unpaid = ticketsExtended ? sumQty(entries.filter((e) => !e.paid)) : 0;
+    const warning = unpaid > 0 ? `\n\n${unpaid} ticket${unpaid === 1 ? ' is' : 's are'} still marked as unpaid and will be included.` : '';
+    if (!confirm('Draw a winner for this raffle now? This cannot be undone.' + warning)) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Drawing…';
+
+    const weighted = [];
+    entries.forEach((e) => { for (let i = 0; i < e.quantity; i++) weighted.push(e); });
+    const winnerEntry = weighted[Math.floor(Math.random() * weighted.length)];
+    const winnerName = holderName(winnerEntry);
+
+    await sb.from('raffles').update({
+      status: 'drawn',
+      winner_entry_id: winnerEntry.id,
+      winner_name: winnerName
+    }).eq('id', raffleId);
+
+    await renderRaffles();
+  }
+});
 
 document.getElementById('add-raffle-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -331,7 +564,15 @@ async function init() {
   session = status.session;
   isAdmin = status.isAdmin;
   document.getElementById('page-content').classList.remove('hidden');
-  if (isAdmin) document.getElementById('admin-section').classList.remove('hidden');
+
+  if (isAdmin) {
+    document.getElementById('admin-section').classList.remove('hidden');
+    const { data: profiles } = await sb.from('profiles').select('id, full_name, status').order('full_name');
+    (profiles || []).forEach((p) => { nameById[p.id] = p.full_name; });
+    approvedMembers = (profiles || []).filter((p) => p.status === 'approved');
+  } else if (status.profile) {
+    nameById[session.user.id] = status.profile.full_name;
+  }
 
   await renderRaffles();
 }

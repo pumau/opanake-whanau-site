@@ -15,7 +15,6 @@
 </a>
 <nav class="nav">
 <a href="index.html">Home</a>
-<a href="branches.html">Branches</a>
 <a href="whakapapa.html">Whakapapa</a>
 <a href="history.html">History</a>
 <a href="events.html">Events</a>
@@ -48,8 +47,20 @@
 </div>
 
 <div id="page-content" class="hidden container" style="padding-top: 12px; padding-bottom: 56px;">
+<div class="two-col">
 
-<form id="new-topic-form" class="card" style="margin-bottom: 24px;">
+<div class="col-main">
+<div class="filter-bar">
+<input id="f-search" type="text" placeholder="Search topics and posts…" style="flex: 1; min-width: 200px;">
+<select id="f-category"><option value="">All categories</option></select>
+</div>
+<div id="categories" style="display: flex; flex-direction: column; gap: 20px;">
+<div class="help-text">Loading forum…</div>
+</div>
+</div>
+
+<div class="col-side">
+<form id="new-topic-form" class="card">
 <h2 style="font-size: 17px; margin: 0 0 16px;">Start a new topic</h2>
 <div class="field">
 <label for="nt-category">Category</label>
@@ -61,16 +72,14 @@
 </div>
 <div class="field">
 <label for="nt-body">First post</label>
-<textarea id="nt-body" required rows="4" style="font: inherit; font-size: 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); resize: vertical;"></textarea>
+<textarea id="nt-body" required rows="5" style="font: inherit; font-size: 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); resize: vertical;"></textarea>
 </div>
 <div id="nt-error" class="error-text hidden"></div>
 <button type="submit" id="nt-submit" class="btn">Post topic</button>
 </form>
-
-<div id="categories" style="display: flex; flex-direction: column; gap: 28px;">
-<div class="help-text">Loading forum…</div>
 </div>
 
+</div>
 </div>
 </main>
 
@@ -92,58 +101,87 @@ function formatDate(iso) {
 
 let session = null;
 let nameById = {};
+let categories = [];
+let topics = [];
+let postCounts = {};
+let postText = {};
+
+function renderForum() {
+  const container = document.getElementById('categories');
+  const search = document.getElementById('f-search').value.trim().toLowerCase();
+  const categoryFilter = document.getElementById('f-category').value;
+  const searching = !!search || !!categoryFilter;
+
+  const html = categories
+    .filter((c) => !categoryFilter || c.id === categoryFilter)
+    .map((c) => {
+      const catTopics = topics.filter((t) => {
+        if (t.category_id !== c.id) return false;
+        if (!search) return true;
+        return (t.title || '').toLowerCase().includes(search) || (postText[t.id] || '').includes(search);
+      });
+
+      if (searching && catTopics.length === 0 && !(categoryFilter && !search)) return '';
+
+      const topicsHtml = catTopics.length
+        ? catTopics.map((t) => `
+            <a href="topic.html?id=${encodeURIComponent(t.id)}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border); gap: 12px;">
+              <div>
+                <div style="font-weight:600; font-size:14.5px;">${escapeHtml(t.title)}</div>
+                <div class="help-text" style="margin-top:2px;">${escapeHtml(nameById[t.author_id] || 'A whānau member')} · ${formatDate(t.created_at)}</div>
+              </div>
+              <div class="help-text" style="flex-shrink:0;">${postCounts[t.id] || 1} post${(postCounts[t.id] || 1) === 1 ? '' : 's'}</div>
+            </a>`).join('')
+        : '<p class="help-text" style="padding: 8px 0;">No topics yet — be the first to post.</p>';
+
+      return `
+        <div class="card">
+          <h2 style="font-size: 18px; margin: 0;">${escapeHtml(c.name)}</h2>
+          ${c.description ? `<p class="help-text" style="margin-top:4px;">${escapeHtml(c.description)}</p>` : ''}
+          <div style="margin-top: 12px;">${topicsHtml}</div>
+        </div>`;
+    }).join('');
+
+  container.innerHTML = html || '<p class="help-text">No topics match that search.</p>';
+}
 
 async function loadForum() {
   const { data: directory } = await sb.rpc('list_member_directory');
   if (directory) directory.forEach((m) => { nameById[m.id] = m.full_name; });
 
-  const { data: categories, error: catError } = await sb
+  const { data: cats, error: catError } = await sb
     .from('forum_categories')
     .select('id, name, description, sort_order')
     .order('sort_order');
 
-  const { data: topics } = await sb
+  const { data: topicRows } = await sb
     .from('forum_topics')
     .select('id, category_id, title, author_id, created_at')
     .order('created_at', { ascending: false });
 
   const { data: allPosts } = await sb
     .from('forum_posts')
-    .select('topic_id');
+    .select('topic_id, body');
 
-  const postCounts = {};
-  (allPosts || []).forEach((p) => { postCounts[p.topic_id] = (postCounts[p.topic_id] || 0) + 1; });
-
-  const container = document.getElementById('categories');
-
-  if (catError || !categories) {
-    container.innerHTML = '<p class="error-text">Could not load the forum right now.</p>';
+  if (catError || !cats) {
+    document.getElementById('categories').innerHTML = '<p class="error-text">Could not load the forum right now.</p>';
     return;
   }
 
-  container.innerHTML = categories.map((c) => {
-    const catTopics = (topics || []).filter((t) => t.category_id === c.id);
-    const topicsHtml = catTopics.length
-      ? catTopics.map((t) => `
-          <a href="topic.html?id=${encodeURIComponent(t.id)}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border); gap: 12px;">
-            <div>
-              <div style="font-weight:600; font-size:14.5px;">${escapeHtml(t.title)}</div>
-              <div class="help-text" style="margin-top:2px;">${escapeHtml(nameById[t.author_id] || 'A whānau member')} · ${formatDate(t.created_at)}</div>
-            </div>
-            <div class="help-text" style="flex-shrink:0;">${postCounts[t.id] || 1} post${(postCounts[t.id] || 1) === 1 ? '' : 's'}</div>
-          </a>`).join('')
-      : '<p class="help-text" style="padding: 8px 0;">No topics yet — be the first to post.</p>';
+  categories = cats;
+  topics = topicRows || [];
+  postCounts = {};
+  postText = {};
+  (allPosts || []).forEach((p) => {
+    postCounts[p.topic_id] = (postCounts[p.topic_id] || 0) + 1;
+    postText[p.topic_id] = (postText[p.topic_id] || '') + ' ' + (p.body || '').toLowerCase();
+  });
 
-    return `
-      <div class="card">
-        <h2 style="font-size: 18px; margin: 0;">${escapeHtml(c.name)}</h2>
-        ${c.description ? `<p class="help-text" style="margin-top:4px;">${escapeHtml(c.description)}</p>` : ''}
-        <div style="margin-top: 12px;">${topicsHtml}</div>
-      </div>`;
-  }).join('');
+  const options = categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  document.getElementById('nt-category').innerHTML = options;
+  document.getElementById('f-category').innerHTML = '<option value="">All categories</option>' + options;
 
-  const select = document.getElementById('nt-category');
-  select.innerHTML = categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  renderForum();
 }
 
 document.getElementById('new-topic-form').addEventListener('submit', async (e) => {
@@ -192,6 +230,8 @@ async function init() {
   if (!status.approved) return;
   session = status.session;
   document.getElementById('page-content').classList.remove('hidden');
+  document.getElementById('f-search').addEventListener('input', renderForum);
+  document.getElementById('f-category').addEventListener('change', renderForum);
   await loadForum();
 }
 

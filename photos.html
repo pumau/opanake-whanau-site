@@ -15,7 +15,6 @@
 </a>
 <nav class="nav">
 <a href="index.html">Home</a>
-<a href="branches.html">Branches</a>
 <a href="whakapapa.html">Whakapapa</a>
 <a href="history.html">History</a>
 <a href="events.html">Events</a>
@@ -48,8 +47,20 @@
 </div>
 
 <div id="page-content" class="hidden container" style="padding-top: 12px; padding-bottom: 56px;">
+<div class="two-col">
 
-<form id="upload-form" class="card" style="margin-bottom: 24px;">
+<div class="col-main">
+<div class="filter-bar">
+<select id="ph-branch-filter"><option value="">All branches</option></select>
+<input id="ph-search" type="text" placeholder="Search who's in it…">
+</div>
+<div id="gallery" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
+<div class="help-text">Loading photos…</div>
+</div>
+</div>
+
+<div class="col-side">
+<form id="upload-form" class="card">
 <h2 style="font-size: 16px; margin: 0 0 16px;">Add a photo</h2>
 <div class="field">
 <label for="ph-file">Photo</label>
@@ -70,11 +81,9 @@
 <div id="ph-error" class="error-text hidden"></div>
 <button type="submit" id="ph-submit" class="btn">Upload</button>
 </form>
-
-<div id="gallery" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;">
-<div class="help-text">Loading photos…</div>
 </div>
 
+</div>
 </div>
 </main>
 
@@ -91,40 +100,61 @@ function escapeHtml(s) {
 
 let branchNameById = {};
 let session = null;
+let allPhotos = [];
+let urlByPhotoId = {};
 
-async function renderGallery() {
-  const { data: photos, error } = await sb
-    .from('photos')
-    .select('id, branch_id, person_name, caption, storage_path, created_at')
-    .order('created_at', { ascending: false });
-
+function renderGallery() {
   const gallery = document.getElementById('gallery');
+  const branchFilter = document.getElementById('ph-branch-filter').value;
+  const search = document.getElementById('ph-search').value.trim().toLowerCase();
 
-  if (error || !photos) {
-    gallery.innerHTML = '<p class="error-text">Could not load photos right now.</p>';
-    return;
-  }
+  const photos = allPhotos.filter((p) => {
+    if (branchFilter && p.branch_id !== branchFilter) return false;
+    if (search && !((p.person_name || '') + ' ' + (p.caption || '')).toLowerCase().includes(search)) return false;
+    return true;
+  });
 
-  if (photos.length === 0) {
+  if (allPhotos.length === 0) {
     gallery.innerHTML = '<p class="help-text">No photos yet — be the first to add one.</p>';
     return;
   }
+  if (photos.length === 0) {
+    gallery.innerHTML = '<p class="help-text">No photos match that filter.</p>';
+    return;
+  }
 
-  const cards = await Promise.all(photos.map(async (p) => {
-    const { data: signed } = await sb.storage.from('photos').createSignedUrl(p.storage_path, 3600);
-    const url = signed ? signed.signedUrl : '';
+  gallery.innerHTML = photos.map((p) => {
+    const url = urlByPhotoId[p.id] || '';
     return `
       <div class="card" style="padding: 0; overflow: hidden;">
-        ${url ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(p.person_name)}" style="width:100%; height:160px; object-fit:cover; display:block;">` : '<div style="height:160px; background: var(--surface-2);"></div>'}
+        ${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><img src="${escapeHtml(url)}" alt="${escapeHtml(p.person_name)}" style="width:100%; height:170px; object-fit:cover; display:block;"></a>` : '<div style="height:170px; background: var(--surface-2);"></div>'}
         <div style="padding: 14px;">
           <div style="font-weight:600; font-size:13.5px;">${escapeHtml(p.person_name)}</div>
           <div class="help-text" style="margin-top:2px;">${escapeHtml(branchNameById[p.branch_id] || '')}</div>
           ${p.caption ? `<div style="font-size:13px; margin-top:6px;">${escapeHtml(p.caption)}</div>` : ''}
         </div>
       </div>`;
-  }));
+  }).join('');
+}
 
-  gallery.innerHTML = cards.join('');
+async function loadGallery() {
+  const { data: photos, error } = await sb
+    .from('photos')
+    .select('id, branch_id, person_name, caption, storage_path, created_at')
+    .order('created_at', { ascending: false });
+
+  if (error || !photos) {
+    document.getElementById('gallery').innerHTML = '<p class="error-text">Could not load photos right now.</p>';
+    return;
+  }
+
+  allPhotos = photos;
+  urlByPhotoId = {};
+  await Promise.all(photos.map(async (p) => {
+    const { data: signed } = await sb.storage.from('photos').createSignedUrl(p.storage_path, 3600);
+    if (signed) urlByPhotoId[p.id] = signed.signedUrl;
+  }));
+  renderGallery();
 }
 
 async function init() {
@@ -136,10 +166,14 @@ async function init() {
   const { data: branches } = await sb.from('branches').select('id, name, sort_order').order('sort_order');
   (branches || []).forEach((b) => { branchNameById[b.id] = b.name; });
 
-  const branchSelect = document.getElementById('ph-branch');
-  branchSelect.innerHTML = (branches || []).map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+  const options = (branches || []).map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+  document.getElementById('ph-branch').innerHTML = options;
+  document.getElementById('ph-branch-filter').innerHTML = '<option value="">All branches</option>' + options;
 
-  await renderGallery();
+  document.getElementById('ph-branch-filter').addEventListener('change', renderGallery);
+  document.getElementById('ph-search').addEventListener('input', renderGallery);
+
+  await loadGallery();
 }
 
 document.getElementById('upload-form').addEventListener('submit', async (e) => {
@@ -163,7 +197,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   btn.disabled = true;
   btn.textContent = 'Uploading…';
 
-  const storagePath = `${session.user.id}/${Date.now()}-${file.name}`;
+  const storagePath = `${session.user.id}/${Date.now()}-${safeFileName(file.name)}`;
   const { error: uploadError } = await sb.storage.from('photos').upload(storagePath, file);
 
   if (uploadError) {
@@ -192,7 +226,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   }
 
   document.getElementById('upload-form').reset();
-  await renderGallery();
+  await loadGallery();
 });
 
 init();

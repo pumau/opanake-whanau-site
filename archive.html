@@ -15,7 +15,6 @@
 </a>
 <nav class="nav">
 <a href="index.html">Home</a>
-<a href="branches.html">Branches</a>
 <a href="whakapapa.html">Whakapapa</a>
 <a href="history.html">History</a>
 <a href="events.html">Events</a>
@@ -35,8 +34,8 @@
 <main>
 <div class="hero" style="padding-bottom: 8px;">
 <div class="eyebrow">Archive</div>
-<h1 style="font-size: 32px; margin-top: 8px;">Meeting minutes &amp; Māori Land Court records</h1>
-<p>Shared documents for the whānau trust — visible to signed-in, approved members.</p>
+<h1 style="font-size: 32px; margin-top: 8px;">Documents &amp; records</h1>
+<p>Meeting minutes, Māori Land Court records and other shared documents — visible to signed-in, approved members. Anyone approved can add a document.</p>
 </div>
 
 <div id="access-gate" class="container hidden" style="padding-top: 12px; padding-bottom: 56px;">
@@ -48,8 +47,24 @@
 </div>
 
 <div id="page-content" class="hidden container" style="padding-top: 12px; padding-bottom: 56px;">
+<div class="two-col">
 
-<div id="admin-upload" class="card hidden" style="margin-bottom: 24px;">
+<div class="col-main">
+<div class="filter-bar">
+<input id="f-search" type="text" placeholder="Search titles…">
+<select id="f-category"><option value="">All categories</option></select>
+<label class="help-text" style="display:flex; align-items:center; gap:6px;">From <input id="f-from" type="date"></label>
+<label class="help-text" style="display:flex; align-items:center; gap:6px;">To <input id="f-to" type="date"></label>
+<button type="button" id="f-clear" class="btn btn-outline" style="padding: 8px 14px; font-size: 13px;">Clear</button>
+</div>
+<p id="file-count" class="help-text" style="margin-bottom: 12px;"></p>
+<div id="file-list" style="display: flex; flex-direction: column; gap: 12px;">
+<div class="help-text">Loading archive…</div>
+</div>
+</div>
+
+<div class="col-side">
+<div class="card">
 <h2 style="font-size: 16px; margin: 0 0 16px;">Upload a document</h2>
 <div class="field">
 <label for="up-title">Title</label>
@@ -57,10 +72,11 @@
 </div>
 <div class="field">
 <label for="up-category">Category</label>
-<select id="up-category">
-<option value="minutes">Meeting minutes</option>
-<option value="land_court">Māori Land Court record</option>
-</select>
+<select id="up-category"></select>
+</div>
+<div class="field hidden" id="up-new-category-field">
+<label for="up-new-category">New category name</label>
+<input id="up-new-category" type="text" placeholder="e.g. Succession paperwork">
 </div>
 <div class="field">
 <label for="up-file">File</label>
@@ -69,11 +85,9 @@
 <div id="up-error" class="error-text hidden"></div>
 <button type="button" id="up-submit" class="btn">Upload</button>
 </div>
-
-<div id="file-list" style="display: flex; flex-direction: column; gap: 12px;">
-<div class="help-text">Loading archive…</div>
 </div>
 
+</div>
 </div>
 </main>
 
@@ -93,37 +107,72 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-const categoryLabels = { minutes: 'Meeting minutes', land_court: 'Māori Land Court record' };
-let isAdmin = false;
+// Two categories existed before members could add their own; their stored
+// values are kept as-is and shown with these friendly names.
+const defaultCategories = { minutes: 'Meeting minutes', land_court: 'Māori Land Court record' };
+const NEW_CATEGORY = '__new__';
+let allFiles = [];
+let session = null;
 
-async function checkAdmin(userId) {
-  const { data } = await sb.from('profiles').select('role').eq('id', userId).single();
-  return !!(data && data.role === 'admin');
+function categoryLabel(value) {
+  return defaultCategories[value] || value;
 }
 
-async function renderFiles() {
-  const { data: files, error } = await sb
-    .from('archive_files')
-    .select('id, title, category, storage_path, uploaded_at')
-    .order('uploaded_at', { ascending: false });
+function knownCategories() {
+  const values = new Set(Object.keys(defaultCategories));
+  allFiles.forEach((f) => { if (f.category) values.add(f.category); });
+  return Array.from(values).sort((a, b) => categoryLabel(a).localeCompare(categoryLabel(b)));
+}
 
+function refreshCategoryControls() {
+  const cats = knownCategories();
+
+  const filter = document.getElementById('f-category');
+  const currentFilter = filter.value;
+  filter.innerHTML = '<option value="">All categories</option>' +
+    cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(categoryLabel(c))}</option>`).join('');
+  filter.value = cats.includes(currentFilter) ? currentFilter : '';
+
+  const upload = document.getElementById('up-category');
+  const currentUpload = upload.value;
+  upload.innerHTML = cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(categoryLabel(c))}</option>`).join('') +
+    `<option value="${NEW_CATEGORY}">+ Add a new category…</option>`;
+  if (currentUpload && (cats.includes(currentUpload) || currentUpload === NEW_CATEGORY)) upload.value = currentUpload;
+}
+
+function renderFiles() {
   const listEl = document.getElementById('file-list');
+  const search = document.getElementById('f-search').value.trim().toLowerCase();
+  const category = document.getElementById('f-category').value;
+  const from = document.getElementById('f-from').value;
+  const to = document.getElementById('f-to').value;
 
-  if (error || !files) {
-    listEl.innerHTML = '<p class="error-text">Could not load the archive right now.</p>';
+  const files = allFiles.filter((f) => {
+    if (category && f.category !== category) return false;
+    if (search && !(f.title || '').toLowerCase().includes(search)) return false;
+    const day = (f.uploaded_at || '').slice(0, 10);
+    if (from && day < from) return false;
+    if (to && day > to) return false;
+    return true;
+  });
+
+  document.getElementById('file-count').textContent =
+    allFiles.length ? `Showing ${files.length} of ${allFiles.length} document${allFiles.length === 1 ? '' : 's'}` : '';
+
+  if (allFiles.length === 0) {
+    listEl.innerHTML = '<p class="help-text">No documents uploaded yet.</p>';
     return;
   }
-
   if (files.length === 0) {
-    listEl.innerHTML = '<p class="help-text">No documents uploaded yet.</p>';
+    listEl.innerHTML = '<p class="help-text">No documents match those filters.</p>';
     return;
   }
 
   listEl.innerHTML = files.map((f) => `
-    <div class="card" style="display:flex; justify-content:space-between; align-items:center; gap: 16px; flex-wrap: wrap;">
+    <div class="card" style="display:flex; justify-content:space-between; align-items:center; gap: 16px; flex-wrap: wrap; padding: 18px 22px;">
       <div>
         <div style="font-weight:600; font-size:14.5px;">${escapeHtml(f.title)}</div>
-        <div class="help-text" style="margin-top:2px;">${categoryLabels[f.category] || f.category} · uploaded ${formatDate(f.uploaded_at)}</div>
+        <div class="help-text" style="margin-top:2px;">${escapeHtml(categoryLabel(f.category))} · uploaded ${formatDate(f.uploaded_at)}</div>
       </div>
       <a data-path="${escapeHtml(f.storage_path)}" class="btn btn-outline download-link" href="#">Download</a>
     </div>`).join('');
@@ -142,13 +191,43 @@ async function renderFiles() {
   });
 }
 
+async function loadFiles() {
+  const { data: files, error } = await sb
+    .from('archive_files')
+    .select('id, title, category, storage_path, uploaded_at')
+    .order('uploaded_at', { ascending: false });
+
+  if (error || !files) {
+    document.getElementById('file-list').innerHTML = '<p class="error-text">Could not load the archive right now.</p>';
+    return;
+  }
+  allFiles = files;
+  refreshCategoryControls();
+  renderFiles();
+}
+
 async function init() {
   const status = await initAccessGate();
   if (!status.approved) return;
+  session = status.session;
   document.getElementById('page-content').classList.remove('hidden');
-  isAdmin = status.isAdmin;
-  if (isAdmin) document.getElementById('admin-upload').classList.remove('hidden');
-  await renderFiles();
+
+  ['f-search', 'f-category', 'f-from', 'f-to'].forEach((id) => {
+    document.getElementById(id).addEventListener(id === 'f-search' ? 'input' : 'change', renderFiles);
+  });
+  document.getElementById('f-clear').addEventListener('click', () => {
+    document.getElementById('f-search').value = '';
+    document.getElementById('f-category').value = '';
+    document.getElementById('f-from').value = '';
+    document.getElementById('f-to').value = '';
+    renderFiles();
+  });
+  document.getElementById('up-category').addEventListener('change', (e) => {
+    document.getElementById('up-new-category-field').classList.toggle('hidden', e.target.value !== NEW_CATEGORY);
+  });
+
+  refreshCategoryControls();
+  await loadFiles();
 }
 
 document.getElementById('up-submit').addEventListener('click', async () => {
@@ -157,12 +236,13 @@ document.getElementById('up-submit').addEventListener('click', async () => {
   errorEl.classList.add('hidden');
 
   const title = document.getElementById('up-title').value.trim();
-  const category = document.getElementById('up-category').value;
+  let category = document.getElementById('up-category').value;
+  if (category === NEW_CATEGORY) category = document.getElementById('up-new-category').value.trim();
   const fileInput = document.getElementById('up-file');
   const file = fileInput.files[0];
 
-  if (!title || !file) {
-    errorEl.textContent = 'Add a title and choose a file first.';
+  if (!title || !file || !category) {
+    errorEl.textContent = 'Add a title, a category and choose a file first.';
     errorEl.classList.remove('hidden');
     return;
   }
@@ -170,7 +250,7 @@ document.getElementById('up-submit').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = 'Uploading…';
 
-  const storagePath = `${category}/${Date.now()}-${file.name}`;
+  const storagePath = `uploads/${Date.now()}-${safeFileName(file.name)}`;
   const { error: uploadError } = await sb.storage.from('archive').upload(storagePath, file);
 
   if (uploadError) {
@@ -181,7 +261,6 @@ document.getElementById('up-submit').addEventListener('click', async () => {
     return;
   }
 
-  const { data: { session } } = await sb.auth.getSession();
   const { error: insertError } = await sb.from('archive_files').insert({
     title,
     category,
@@ -193,14 +272,19 @@ document.getElementById('up-submit').addEventListener('click', async () => {
   btn.textContent = 'Upload';
 
   if (insertError) {
-    errorEl.textContent = insertError.message;
+    errorEl.textContent = insertError.message.includes('archive_files_category_check')
+      ? 'Custom categories need database update #8 to be run first.'
+      : insertError.message;
     errorEl.classList.remove('hidden');
     return;
   }
 
   document.getElementById('up-title').value = '';
+  document.getElementById('up-new-category').value = '';
+  document.getElementById('up-new-category-field').classList.add('hidden');
   fileInput.value = '';
-  await renderFiles();
+  await loadFiles();
+  document.getElementById('up-category').value = category;
 });
 
 init();

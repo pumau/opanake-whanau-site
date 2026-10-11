@@ -72,3 +72,17 @@ async function initAccessGate() {
   }
   return status;
 }
+
+// Storage keys only allow plain characters. Spaces, macrons (ā, ē, ī, ō, ū)
+// and other symbols in a file name cause an "Invalid key" error on upload,
+// so every upload builds its storage path from this cleaned-up name. The
+// original name is not needed afterwards (the document's Title is what
+// people see).
+function safeFileName(name) {
+  const cleaned = String(name || 'file')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return cleaned || 'file';
+}
