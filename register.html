@@ -160,7 +160,7 @@ async function loadBranches() {
   }
 
   branchSelect.innerHTML = unknownOption +
-    branches.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+    sortBranchesByYear(branches).map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
 
   const params = new URLSearchParams(window.location.search);
   const preselect = params.get('branch');

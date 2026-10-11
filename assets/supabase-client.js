@@ -86,3 +86,22 @@ function safeFileName(name) {
     .replace(/^_+|_+$/g, '');
   return cleaned || 'file';
 }
+
+// Branches are named for the sibling and carry their birth year in brackets,
+// e.g. "Pua Howearth (1924)". The site lists them oldest first by that year;
+// any without a year in the name keep their usual order after the dated ones.
+function branchYear(name) {
+  const m = /\((\d{4})\)/.exec(String(name || ''));
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function sortBranchesByYear(list) {
+  return (list || []).map((b, i) => ({ b, i, y: branchYear(b.name) }))
+    .sort((a, c) => {
+      if (a.y !== null && c.y !== null) return a.y - c.y || a.i - c.i;
+      if (a.y !== null) return -1;
+      if (c.y !== null) return 1;
+      return a.i - c.i;
+    })
+    .map((x) => x.b);
+}

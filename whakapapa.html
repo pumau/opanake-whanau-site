@@ -148,7 +148,7 @@ function renderDirectory() {
 async function loadWhakapapa() {
   const { data: branches } = await sb.from('branches').select('*').order('sort_order');
   // Gallery-only "branches" (e.g. Nanny Irihapeti) are for the Photos page, not whakapapa.
-  allBranches = (branches || []).filter((b) => !b.gallery_only);
+  allBranches = sortBranchesByYear((branches || []).filter((b) => !b.gallery_only));
 
   const { data: directory } = await sb.rpc('list_member_directory');
 
@@ -160,7 +160,8 @@ async function loadWhakapapa() {
 
   const cardStyle = 'background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 6px;';
   branchGrid.innerHTML = allBranches.map((b, i) => {
-    const num = `<div style="width:34px;height:34px;border-radius:9px;background:var(--accent-2-soft);display:flex;align-items:center;justify-content:center;font-family:Fraunces,serif;font-weight:700;font-size:14px;color:var(--accent-2);">${i + 1}</div>`;
+    const year = branchYear(b.name);
+    const num = `<div style="align-self:flex-start;min-width:34px;height:34px;padding:0 10px;border-radius:9px;background:var(--accent-2-soft);display:flex;align-items:center;justify-content:center;font-family:Fraunces,serif;font-weight:700;font-size:14px;color:var(--accent-2);">${year || '·'}</div>`;
     const count = `<span class="help-text">${counts[b.id] ? counts[b.id] + ' whānau linked' : 'No one linked yet'}</span>`;
     if (isAdmin) {
       return `<div style="${cardStyle}">

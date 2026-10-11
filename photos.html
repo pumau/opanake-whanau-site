@@ -201,7 +201,8 @@ async function init() {
   isAdmin = !!status.isAdmin;
   document.getElementById('page-content').classList.remove('hidden');
 
-  const { data: branches } = await sb.from('branches').select('*').order('sort_order');
+  const { data: rawBranches } = await sb.from('branches').select('*').order('sort_order');
+  const branches = sortBranchesByYear(rawBranches || []);
   (branches || []).forEach((b) => { branchNameById[b.id] = b.name; });
 
   const options = (branches || []).map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
