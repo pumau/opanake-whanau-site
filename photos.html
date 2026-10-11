@@ -104,6 +104,13 @@ let branchNameById = {};
 let session = null;
 let allPhotos = [];
 let urlByPhotoId = {};
+let isAdmin = false;
+let editingId = null;
+
+function branchOptionsHtml(selectedId) {
+  return Object.keys(branchNameById).map((id) =>
+    `<option value="${id}"${id === selectedId ? ' selected' : ''}>${escapeHtml(branchNameById[id])}</option>`).join('');
+}
 
 function renderGallery() {
   const gallery = document.getElementById('gallery');
@@ -127,14 +134,42 @@ function renderGallery() {
 
   gallery.innerHTML = photos.map((p) => {
     const url = urlByPhotoId[p.id] || '';
+    const image = url
+      ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><img src="${escapeHtml(url)}" alt="${escapeHtml(p.person_name)}" style="width:100%; height:170px; object-fit:cover; display:block;"></a>`
+      : '<div style="height:170px; background: var(--surface-2);"></div>';
+
+    let body;
+    if (isAdmin && editingId === p.id) {
+      body = `
+        <div class="field" style="margin-bottom:10px;">
+          <label>Who's in it</label>
+          <input type="text" data-edit="person" value="${escapeHtml(p.person_name)}">
+        </div>
+        <div class="field" style="margin-bottom:10px;">
+          <label>Branch</label>
+          <select data-edit="branch">${branchOptionsHtml(p.branch_id)}</select>
+        </div>
+        <div class="field" style="margin-bottom:10px;">
+          <label>Caption</label>
+          <input type="text" data-edit="caption" value="${escapeHtml(p.caption || '')}">
+        </div>
+        <div class="error-text hidden" data-edit-error></div>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="btn" data-action="save-edit" data-id="${p.id}">Save</button>
+          <button type="button" class="btn btn-outline" data-action="cancel-edit">Cancel</button>
+        </div>`;
+    } else {
+      body = `
+        <div style="font-weight:600; font-size:13.5px;">${escapeHtml(p.person_name)}</div>
+        <div class="help-text" style="margin-top:2px;">${escapeHtml(branchNameById[p.branch_id] || '')}</div>
+        ${p.caption ? `<div style="font-size:13px; margin-top:6px;">${escapeHtml(p.caption)}</div>` : ''}
+        ${isAdmin ? `<button type="button" class="btn btn-outline" style="margin-top:10px;" data-action="edit" data-id="${p.id}">Edit</button>` : ''}`;
+    }
+
     return `
       <div class="card" style="padding: 0; overflow: hidden;">
-        ${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><img src="${escapeHtml(url)}" alt="${escapeHtml(p.person_name)}" style="width:100%; height:170px; object-fit:cover; display:block;"></a>` : '<div style="height:170px; background: var(--surface-2);"></div>'}
-        <div style="padding: 14px;">
-          <div style="font-weight:600; font-size:13.5px;">${escapeHtml(p.person_name)}</div>
-          <div class="help-text" style="margin-top:2px;">${escapeHtml(branchNameById[p.branch_id] || '')}</div>
-          ${p.caption ? `<div style="font-size:13px; margin-top:6px;">${escapeHtml(p.caption)}</div>` : ''}
-        </div>
+        ${image}
+        <div style="padding: 14px;">${body}</div>
       </div>`;
   }).join('');
 }
@@ -163,6 +198,7 @@ async function init() {
   const status = await initAccessGate();
   if (!status.approved) return;
   session = status.session;
+  isAdmin = !!status.isAdmin;
   document.getElementById('page-content').classList.remove('hidden');
 
   const { data: branches } = await sb.from('branches').select('id, name, sort_order').order('sort_order');
@@ -174,6 +210,49 @@ async function init() {
 
   document.getElementById('ph-branch-filter').addEventListener('change', renderGallery);
   document.getElementById('ph-search').addEventListener('input', renderGallery);
+
+  document.getElementById('gallery').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn || !isAdmin) return;
+    const action = btn.getAttribute('data-action');
+
+    if (action === 'edit') {
+      editingId = btn.getAttribute('data-id');
+      renderGallery();
+    } else if (action === 'cancel-edit') {
+      editingId = null;
+      renderGallery();
+    } else if (action === 'save-edit') {
+      const card = btn.closest('.card');
+      const person = card.querySelector('[data-edit=person]').value.trim();
+      const branchId = card.querySelector('[data-edit=branch]').value;
+      const caption = card.querySelector('[data-edit=caption]').value.trim();
+      const errorEl = card.querySelector('[data-edit-error]');
+      errorEl.classList.add('hidden');
+      if (!person) {
+        errorEl.textContent = "Add who's in the photo.";
+        errorEl.classList.remove('hidden');
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      const id = btn.getAttribute('data-id');
+      const { error } = await sb.from('photos')
+        .update({ person_name: person, branch_id: branchId, caption: caption || null })
+        .eq('id', id);
+      if (error) {
+        errorEl.textContent = "Couldn't save that: " + error.message;
+        errorEl.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'Save';
+        return;
+      }
+      const photo = allPhotos.find((p) => p.id === id);
+      if (photo) { photo.person_name = person; photo.branch_id = branchId; photo.caption = caption || null; }
+      editingId = null;
+      renderGallery();
+    }
+  });
 
   await loadGallery();
 }
