@@ -53,7 +53,7 @@
 <h2 style="font-size: 16px; margin: 0 0 16px;">Add a meeting</h2>
 <div class="field">
 <label for="nm-title">Title</label>
-<input id="nm-title" type="text" required placeholder="e.g. October 2026 Trustee Hui">
+<input id="nm-title" type="text" required placeholder="e.g. October 2026 Whānau Hui">
 </div>
 <div class="field">
 <label for="nm-date">Date (optional)</label>
@@ -77,7 +77,7 @@
 
 <footer class="footer">
 <img class="footer-map" src="assets/footer-map.jpg" alt="Aerial map of the Ōpanake 1C South blocks near Mamaranui, Kaihu" loading="lazy">
-© Ōpanake 1C South 6B whānau trust
+© Ōpanake 1C South 6B whānau
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -279,7 +279,7 @@ async function finaliseMeeting(meetingId) {
   const lines = [];
   lines.push(meeting.title);
   lines.push(formatDate(meeting.meeting_date));
-  lines.push('Ōpanake 1C South 6B whānau trust');
+  lines.push('Ōpanake 1C South 6B whānau');
   lines.push('');
   lines.push('AGENDA');
   lines.push('------');
