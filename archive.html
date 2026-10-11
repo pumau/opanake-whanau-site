@@ -117,6 +117,8 @@ const defaultCategories = { minutes: 'Meeting minutes', land_court: 'Māori Land
 const NEW_CATEGORY = '__new__';
 let allFiles = [];
 let session = null;
+let isAdmin = false;
+let editingId = null;
 let docDatesSupported = true; // false until database update #9 has been run
 
 function pad2(n) { return String(n).padStart(2, '0'); }
@@ -162,6 +164,41 @@ function refreshCategoryControls() {
   if (currentUpload && (cats.includes(currentUpload) || currentUpload === NEW_CATEGORY)) upload.value = currentUpload;
 }
 
+function fileCardHtml(f) {
+  if (isAdmin && editingId === f.id) {
+    const cats = knownCategories();
+    const options = cats.map((c) => `<option value="${escapeHtml(c)}" ${c === f.category ? 'selected' : ''}>${escapeHtml(categoryLabel(c))}</option>`).join('') +
+      `<option value="${NEW_CATEGORY}">+ Add a new category…</option>`;
+    return `
+      <div class="card" data-file-card="${f.id}" style="padding: 18px 22px; border-color: var(--accent);">
+        <div style="font-weight:600; font-size:14px; margin-bottom:12px;">Edit document</div>
+        <div class="field"><label>Title</label><input type="text" data-edit="title" value="${escapeHtml(f.title)}"></div>
+        <div class="field"><label>Category</label><select data-edit="category">${options}</select></div>
+        <div class="field hidden" data-edit-newcat-field><label>New category name</label><input type="text" data-edit="newcategory"></div>
+        ${docDatesSupported ? `<div class="field"><label>Document date</label><input type="date" data-edit="date" value="${docDate(f)}"></div>` : '<p class="help-text" style="margin-bottom:12px;">Editing dates needs database update #9 to be run first.</p>'}
+        <div class="field"><label>Replace the file (optional)</label><input type="file" data-edit="file"><span class="help-text">Leave empty to keep the current file.</span></div>
+        <div class="error-text hidden" data-edit-error></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" class="btn" data-action="save-edit" data-id="${f.id}">Save changes</button>
+          <button type="button" class="btn btn-outline" data-action="cancel-edit">Cancel</button>
+        </div>
+      </div>`;
+  }
+  return `
+    <div class="card" style="display:flex; justify-content:space-between; align-items:center; gap: 16px; flex-wrap: wrap; padding: 18px 22px;">
+      <div>
+        <div style="font-weight:600; font-size:14.5px;">${escapeHtml(f.title)}</div>
+        <div class="help-text" style="margin-top:2px;">${escapeHtml(categoryLabel(f.category))} · dated ${formatDocDate(docDate(f))}</div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a class="btn btn-outline" href="forum.html?cat=Whenua&topic=${encodeURIComponent('Re: ' + f.title)}">Discuss in forum</a>
+        <a data-action="download" data-path="${escapeHtml(f.storage_path)}" class="btn btn-outline" href="#">Download</a>
+        ${isAdmin ? `<button type="button" class="btn btn-outline" data-action="edit" data-id="${f.id}">Edit</button>
+        <button type="button" class="btn btn-outline" data-action="delete" data-id="${f.id}" style="color:#B3492A;">Delete</button>` : ''}
+      </div>
+    </div>`;
+}
+
 function renderFiles() {
   const listEl = document.getElementById('file-list');
   const search = document.getElementById('f-search').value.trim().toLowerCase();
@@ -191,32 +228,108 @@ function renderFiles() {
   }
 
   files.sort((a, b) => docDate(b).localeCompare(docDate(a)));
+  listEl.innerHTML = files.map(fileCardHtml).join('');
+}
 
-  listEl.innerHTML = files.map((f) => `
-    <div class="card" style="display:flex; justify-content:space-between; align-items:center; gap: 16px; flex-wrap: wrap; padding: 18px 22px;">
-      <div>
-        <div style="font-weight:600; font-size:14.5px;">${escapeHtml(f.title)}</div>
-        <div class="help-text" style="margin-top:2px;">${escapeHtml(categoryLabel(f.category))} · dated ${formatDocDate(docDate(f))}</div>
-      </div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <a class="btn btn-outline" href="forum.html?cat=Whenua&topic=${encodeURIComponent('Re: ' + f.title)}">Discuss in forum</a>
-        <a data-path="${escapeHtml(f.storage_path)}" class="btn btn-outline download-link" href="#">Download</a>
-      </div>
-    </div>`).join('');
+// One set of delegated listeners, so re-rendering the list is always safe.
+document.getElementById('file-list').addEventListener('change', (e) => {
+  if (e.target.getAttribute('data-edit') === 'category') {
+    const card = e.target.closest('[data-file-card]');
+    card.querySelector('[data-edit-newcat-field]').classList.toggle('hidden', e.target.value !== NEW_CATEGORY);
+  }
+});
 
-  document.querySelectorAll('.download-link').forEach((link) => {
-    link.addEventListener('click', async (e) => {
-      e.preventDefault();
-      const path = link.getAttribute('data-path');
-      const { data, error: signError } = await sb.storage.from('archive').createSignedUrl(path, 300);
-      if (signError || !data) {
-        alert("Couldn't get that file right now.");
+document.getElementById('file-list').addEventListener('click', async (e) => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const action = el.getAttribute('data-action');
+  const id = el.getAttribute('data-id');
+
+  if (action === 'download') {
+    e.preventDefault();
+    const { data, error: signError } = await sb.storage.from('archive').createSignedUrl(el.getAttribute('data-path'), 300);
+    if (signError || !data) {
+      alert("Couldn't get that file right now.");
+      return;
+    }
+    window.open(data.signedUrl, '_blank');
+    return;
+  }
+
+  if (action === 'edit') { editingId = id; renderFiles(); return; }
+  if (action === 'cancel-edit') { editingId = null; renderFiles(); return; }
+
+  if (action === 'delete') {
+    const f = allFiles.find((x) => x.id === id);
+    if (!f || !confirm(`Delete "${f.title}"? The file will be removed for everyone and this can't be undone.`)) return;
+    el.disabled = true;
+    // A finalised meeting may point at this document; let go of it first.
+    await sb.from('meetings').update({ archive_file_id: null }).eq('archive_file_id', id);
+    const { error } = await sb.from('archive_files').delete().eq('id', id);
+    if (error) {
+      alert("Couldn't delete that — " + error.message);
+      el.disabled = false;
+      return;
+    }
+    await sb.storage.from('archive').remove([f.storage_path]);
+    await loadFiles();
+    return;
+  }
+
+  if (action === 'save-edit') {
+    const f = allFiles.find((x) => x.id === id);
+    const card = el.closest('[data-file-card]');
+    const errorEl = card.querySelector('[data-edit-error]');
+    errorEl.classList.add('hidden');
+    const get = (name) => card.querySelector(`[data-edit="${name}"]`);
+
+    const title = get('title').value.trim();
+    let category = get('category').value;
+    if (category === NEW_CATEGORY) category = get('newcategory').value.trim();
+    const dateInput = get('date');
+    const newFile = get('file').files[0];
+
+    if (!title || !category || (dateInput && !dateInput.value)) {
+      errorEl.textContent = 'Title, category and date can\'t be empty.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    el.disabled = true;
+    el.textContent = 'Saving…';
+
+    const changes = { title, category };
+    if (dateInput) changes.document_date = dateInput.value;
+
+    let newPath = null;
+    if (newFile) {
+      newPath = `uploads/${Date.now()}-${safeFileName(newFile.name)}`;
+      const { error: uploadError } = await sb.storage.from('archive').upload(newPath, newFile);
+      if (uploadError) {
+        errorEl.textContent = uploadError.message;
+        errorEl.classList.remove('hidden');
+        el.disabled = false;
+        el.textContent = 'Save changes';
         return;
       }
-      window.open(data.signedUrl, '_blank');
-    });
-  });
-}
+      changes.storage_path = newPath;
+    }
+
+    const { error } = await sb.from('archive_files').update(changes).eq('id', id);
+    if (error) {
+      errorEl.textContent = error.message;
+      errorEl.classList.remove('hidden');
+      el.disabled = false;
+      el.textContent = 'Save changes';
+      if (newPath) await sb.storage.from('archive').remove([newPath]);
+      return;
+    }
+    if (newPath && f) await sb.storage.from('archive').remove([f.storage_path]);
+
+    editingId = null;
+    await loadFiles();
+  }
+});
 
 async function loadFiles() {
   let { data: files, error } = await sb
@@ -246,6 +359,7 @@ async function init() {
   const status = await initAccessGate();
   if (!status.approved) return;
   session = status.session;
+  isAdmin = status.isAdmin;
   document.getElementById('page-content').classList.remove('hidden');
 
   ['f-search', 'f-category', 'f-from', 'f-to'].forEach((id) => {
