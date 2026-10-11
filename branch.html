@@ -112,10 +112,10 @@ async function loadBranch() {
 
   const { data: allBranches, error: branchError } = await sb
     .from('branches')
-    .select('id, name, sort_order')
+    .select('*')
     .order('sort_order');
 
-  const branch = allBranches ? allBranches.find((b) => b.id === branchId) : null;
+  const branch = allBranches ? allBranches.find((b) => b.id === branchId && !b.gallery_only) : null;
 
   if (branchError || !branch) {
     loading.classList.add('hidden');

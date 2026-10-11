@@ -260,8 +260,8 @@ async function renderMembers() {
 async function initAdmin(userId) {
   const { data } = await sb.from('profiles').select('role').eq('id', userId).single();
   if (data && data.role === 'admin') {
-    const { data: branches } = await sb.from('branches').select('id, name').order('sort_order');
-    allBranches = branches || [];
+    const { data: branches } = await sb.from('branches').select('*').order('sort_order');
+    allBranches = (branches || []).filter((b) => !b.gallery_only);
     document.getElementById('admin-approvals').classList.remove('hidden');
     document.getElementById('admin-members').classList.remove('hidden');
     await renderPending();

@@ -201,7 +201,7 @@ async function init() {
   isAdmin = !!status.isAdmin;
   document.getElementById('page-content').classList.remove('hidden');
 
-  const { data: branches } = await sb.from('branches').select('id, name, sort_order').order('sort_order');
+  const { data: branches } = await sb.from('branches').select('*').order('sort_order');
   (branches || []).forEach((b) => { branchNameById[b.id] = b.name; });
 
   const options = (branches || []).map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');

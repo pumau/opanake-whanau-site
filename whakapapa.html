@@ -146,8 +146,9 @@ function renderDirectory() {
 }
 
 async function loadWhakapapa() {
-  const { data: branches } = await sb.from('branches').select('id, name, sort_order').order('sort_order');
-  allBranches = branches || [];
+  const { data: branches } = await sb.from('branches').select('*').order('sort_order');
+  // Gallery-only "branches" (e.g. Nanny Irihapeti) are for the Photos page, not whakapapa.
+  allBranches = (branches || []).filter((b) => !b.gallery_only);
 
   const { data: directory } = await sb.rpc('list_member_directory');
 
