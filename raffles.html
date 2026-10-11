@@ -371,8 +371,14 @@ async function renderRaffles() {
   }));
 
   listEl.innerHTML = raffles.map((r) => {
-    const t = totalsById[r.id] || { total_tickets: 0, total_entrants: 0 };
+    let t = totalsById[r.id] || { total_tickets: 0, total_entrants: 0 };
     const rEntries = entries.filter((e) => e.raffle_id === r.id);
+    // Admins can see every entry, so count people straight from those
+    // (members and guests alike). Everyone else uses the database totals.
+    if (isAdmin) {
+      const holders = new Set(rEntries.map((e) => e.member_id || ('guest:' + String(e.guest_name || '').trim().toLowerCase())));
+      t = { total_tickets: sumQty(rEntries), total_entrants: holders.size };
+    }
     const mine = rEntries.filter((e) => e.member_id === session.user.id);
 
     return `
