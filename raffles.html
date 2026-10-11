@@ -139,6 +139,52 @@ function paidBadge(paid) {
 
 function sumQty(entries) { return entries.reduce((n, e) => n + (e.quantity || 0), 0); }
 
+// ---- Urgency and social proof (real numbers only) ---------------------------
+
+function daysUntil(dateStr) {
+  const [y, m, d] = String(dateStr).slice(0, 10).split('-').map(Number);
+  const target = new Date(y, m - 1, d);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((target - today) / 86400000);
+}
+
+function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+function urgencyHtml(r, t) {
+  if (r.status !== 'open') return '';
+  const entrants = t.total_entrants || 0;
+  const tickets = t.total_tickets || 0;
+  let line = '';
+  let urgent = false;
+  if (r.draw_date) {
+    const d = daysUntil(r.draw_date);
+    if (d < 0) { line = 'The draw date has passed, so entries could close any time'; urgent = true; }
+    else if (d === 0) { line = 'Draw day is today. Last chance to get your tickets'; urgent = true; }
+    else if (d === 1) { line = 'The draw is tomorrow. Last chance to get your tickets'; urgent = true; }
+    else if (d <= 7) { line = 'Only ' + plural(d, 'day') + ' left to get your tickets'; urgent = true; }
+    else { line = 'The draw is in ' + d + ' days'; }
+  }
+  const proof = entrants > 0
+    ? plural(entrants, 'whānau member') + ' ' + (entrants === 1 ? 'is' : 'are') + ' already in with ' + plural(tickets, 'ticket') + ' in the draw'
+    : 'No one has entered yet. Be the first in';
+  const style = urgent
+    ? 'background: var(--accent-2-soft); border: 1px solid var(--accent-2); color: var(--ink);'
+    : 'background: var(--river-soft); border: 1px solid var(--river); color: var(--ink);';
+  return `
+    <div style="${style} border-radius:10px; padding:10px 14px; margin-top:12px; font-size:13.5px;">
+      ${line ? `<div style="font-weight:600;">${escapeHtml(line)}</div>` : ''}
+      <div${line ? ' style="margin-top:2px;"' : ''}>${escapeHtml(proof)}</div>
+    </div>`;
+}
+
+function oddsText(mineQty, extra, totalTickets) {
+  const total = totalTickets + extra;
+  if (total <= 0) return '';
+  const pct = Math.round(((mineQty + extra) / total) * 100);
+  return 'Your chance of winning: about ' + pct + '%';
+}
+
 // ---- The member's own tickets (left column) --------------------------------
 
 function myTicketsHtml(r, mine) {
@@ -162,17 +208,27 @@ function myTicketsHtml(r, mine) {
 
 // ---- Get tickets (right column) --------------------------------------------
 
-function getTicketsHtml(r) {
+function getTicketsHtml(r, t, mine) {
   if (r.status === 'open') {
+    const entrants = t.total_entrants || 0;
+    const totalTickets = t.total_tickets || 0;
+    const mineQty = sumQty(mine);
+    const nudge = mineQty > 0
+      ? `You're in with ${plural(mineQty, 'ticket')} out of ${totalTickets}. Every extra ticket improves your chances.`
+      : entrants > 0
+        ? `${plural(entrants, 'whānau member')} ${entrants === 1 ? 'has' : 'have'} already entered. Don't miss out.`
+        : 'Be the first to get a ticket in the draw.';
     return `
       <div class="card-muted" style="border-radius:14px; padding:20px;">
-        <h3 style="font-size:16px; margin:0 0 4px;">Get tickets</h3>
+        <h3 style="font-size:16px; margin:0 0 4px;">${mineQty > 0 ? 'Get more tickets' : 'Get tickets'}</h3>
+        <p style="font-size:13px; font-weight:600; color: var(--accent-dark); margin: 0 0 6px;">${escapeHtml(nudge)}</p>
         <p class="help-text" style="margin-bottom:14px;">${money(r.ticket_price_cents)} per ticket. We'll follow up with an invoice.</p>
         <div class="field" style="margin-bottom:10px;">
           <label for="qty-${r.id}">How many?</label>
           <input type="number" min="1" value="1" id="qty-${r.id}" class="qty-input" data-price="${r.ticket_price_cents}" data-raffle-id="${r.id}">
         </div>
-        <div class="help-text" style="margin-bottom:14px;">Total: <strong id="total-${r.id}">${money(r.ticket_price_cents)}</strong></div>
+        <div class="help-text" style="margin-bottom:6px;">Total: <strong id="total-${r.id}">${money(r.ticket_price_cents)}</strong></div>
+        <div class="help-text" id="odds-${r.id}" data-mine="${mineQty}" data-total="${totalTickets}" style="margin-bottom:14px;">${oddsText(mineQty, 1, totalTickets)}</div>
         <button type="button" class="btn" data-action="buy" data-raffle-id="${r.id}" style="width:100%; justify-content:center;">Get tickets</button>
       </div>`;
   }
@@ -329,12 +385,13 @@ async function renderRaffles() {
               <span class="badge ${r.status === 'drawn' ? 'badge-approved' : 'badge-pending'}">${statusLabels[r.status] || r.status}</span>
             </div>
             ${r.description ? `<p style="margin-top:8px; font-size:14px;">${escapeHtml(r.description)}</p>` : ''}
-            <p class="help-text" style="margin-top:6px;">${money(r.ticket_price_cents)} per ticket${r.draw_date ? ' · drawn ' + formatDate(r.draw_date) : ''} · ${t.total_tickets || 0} ticket${(t.total_tickets || 0) === 1 ? '' : 's'} sold</p>
+            ${urgencyHtml(r, t)}
+            <p class="help-text" style="margin-top:6px;">${money(r.ticket_price_cents)} per ticket${r.draw_date ? (r.status === 'drawn' ? ' · drawn ' : ' · draw ') + formatDate(r.draw_date) : ''} · ${t.total_tickets || 0} ticket${(t.total_tickets || 0) === 1 ? '' : 's'} sold</p>
             ${r.status === 'drawn' && r.winner_name ? `<p style="margin-top:8px; font-weight:600; color: var(--accent-dark);">Winner: ${escapeHtml(r.winner_name)}</p>` : ''}
             ${myTicketsHtml(r, mine)}
           </div>
           <div class="col-side" style="position: static;">
-            ${getTicketsHtml(r)}
+            ${getTicketsHtml(r, t, mine)}
           </div>
         </div>
         ${isAdmin ? `
@@ -365,6 +422,8 @@ listEl.addEventListener('input', (e) => {
   const qty = Math.max(parseInt(e.target.value, 10) || 0, 0);
   const totalEl = document.getElementById('total-' + e.target.getAttribute('data-raffle-id'));
   if (totalEl) totalEl.textContent = money(qty * parseInt(e.target.getAttribute('data-price'), 10));
+  const oddsEl = document.getElementById('odds-' + e.target.getAttribute('data-raffle-id'));
+  if (oddsEl) oddsEl.textContent = oddsText(parseInt(oddsEl.getAttribute('data-mine'), 10) || 0, qty, parseInt(oddsEl.getAttribute('data-total'), 10) || 0);
 });
 
 listEl.addEventListener('change', async (e) => {
