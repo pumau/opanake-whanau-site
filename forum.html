@@ -99,6 +99,7 @@ function formatDate(iso) {
 }
 
 let session = null;
+let linkedDocId = null; // set when arriving from an Archive document's Discuss link
 let nameById = {};
 let categories = [];
 let topics = [];
@@ -190,6 +191,7 @@ function prefillFromLink() {
   const params = new URLSearchParams(window.location.search);
   const topic = params.get('topic');
   const cat = params.get('cat');
+  linkedDocId = params.get('doc');
   if (!topic && !cat) return;
 
   if (cat) {
@@ -218,11 +220,25 @@ document.getElementById('new-topic-form').addEventListener('submit', async (e) =
   const title = document.getElementById('nt-title').value.trim();
   const body = document.getElementById('nt-body').value.trim();
 
-  const { data: topic, error: topicError } = await sb
+  const newTopic = { category_id: categoryId, author_id: session.user.id, title };
+  if (linkedDocId) newTopic.archive_file_id = linkedDocId;
+
+  let { data: topic, error: topicError } = await sb
     .from('forum_topics')
-    .insert({ category_id: categoryId, author_id: session.user.id, title })
+    .insert(newTopic)
     .select('id')
     .single();
+
+  // Linking a topic to a document needs database update #11; if it hasn't
+  // been run yet, still post the topic (just without the link).
+  if (topicError && linkedDocId && /archive_file_id/.test(topicError.message || '')) {
+    delete newTopic.archive_file_id;
+    ({ data: topic, error: topicError } = await sb
+      .from('forum_topics')
+      .insert(newTopic)
+      .select('id')
+      .single());
+  }
 
   if (topicError || !topic) {
     errorEl.textContent = (topicError && topicError.message) || "Couldn't post that topic — try again.";

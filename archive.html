@@ -119,6 +119,9 @@ let allFiles = [];
 let session = null;
 let isAdmin = false;
 let editingId = null;
+let topicByDocId = {};   // archive document id -> forum topic id, once a discussion exists
+let scrolledToDoc = false;
+let highlightId = new URLSearchParams(window.location.search).get('doc');
 let docDatesSupported = true; // false until database update #9 has been run
 
 function pad2(n) { return String(n).padStart(2, '0'); }
@@ -184,14 +187,18 @@ function fileCardHtml(f) {
         </div>
       </div>`;
   }
+  const discussLink = topicByDocId[f.id]
+    ? `<a class="btn btn-outline" href="topic.html?id=${encodeURIComponent(topicByDocId[f.id])}">View discussion</a>`
+    : `<a class="btn btn-outline" href="forum.html?cat=Whenua&doc=${encodeURIComponent(f.id)}&topic=${encodeURIComponent('Re: ' + f.title)}">Discuss in forum</a>`;
+  const highlighted = highlightId === f.id;
   return `
-    <div class="card" style="display:flex; justify-content:space-between; align-items:center; gap: 16px; flex-wrap: wrap; padding: 18px 22px;">
+    <div class="card" id="doc-${f.id}" style="display:flex; justify-content:space-between; align-items:center; gap: 16px; flex-wrap: wrap; padding: 18px 22px; ${highlighted ? 'border: 2px solid var(--accent); background: var(--river-soft);' : ''}">
       <div>
         <div style="font-weight:600; font-size:14.5px;">${escapeHtml(f.title)}</div>
         <div class="help-text" style="margin-top:2px;">${escapeHtml(categoryLabel(f.category))} · dated ${formatDocDate(docDate(f))}</div>
       </div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <a class="btn btn-outline" href="forum.html?cat=Whenua&topic=${encodeURIComponent('Re: ' + f.title)}">Discuss in forum</a>
+        ${discussLink}
         <a data-action="download" data-path="${escapeHtml(f.storage_path)}" class="btn btn-outline" href="#">Download</a>
         ${isAdmin ? `<button type="button" class="btn btn-outline" data-action="edit" data-id="${f.id}">Edit</button>
         <button type="button" class="btn btn-outline" data-action="delete" data-id="${f.id}" style="color:#B3492A;">Delete</button>` : ''}
@@ -351,8 +358,27 @@ async function loadFiles() {
     return;
   }
   allFiles = files;
+
+  // Which documents already have a forum discussion (needs update #11; if
+  // that hasn't been run the column doesn't exist and we just skip this).
+  topicByDocId = {};
+  const { data: linkedTopics, error: topicsError } = await sb
+    .from('forum_topics')
+    .select('id, archive_file_id, created_at')
+    .not('archive_file_id', 'is', null)
+    .order('created_at', { ascending: false });
+  if (!topicsError) (linkedTopics || []).forEach((t) => { topicByDocId[t.archive_file_id] = t.id; });
+
   refreshCategoryControls();
   renderFiles();
+
+  if (highlightId && !scrolledToDoc) {
+    const el = document.getElementById('doc-' + highlightId);
+    if (el) {
+      scrolledToDoc = true;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
 }
 
 async function init() {

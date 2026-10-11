@@ -56,6 +56,13 @@
 
 <div id="topic-content" class="container hidden" style="padding: 12px 56px 56px; max-width: 760px;">
 <h1 id="topic-title" style="font-size: 28px;">—</h1>
+<div id="doc-link" class="card-muted hidden" style="border-radius: 12px; padding: 14px 18px; margin-top: 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+<div>
+<div class="help-text">About this Archive document</div>
+<div id="doc-link-title" style="font-weight: 600; font-size: 14.5px;"></div>
+</div>
+<a id="doc-link-btn" href="archive.html" class="btn btn-outline">View document</a>
+</div>
 <div id="post-list" style="display: flex; flex-direction: column; gap: 16px; margin-top: 20px;"></div>
 
 <form id="reply-form" class="card" style="margin-top: 24px;">
@@ -100,11 +107,19 @@ async function loadTopic() {
     return;
   }
 
-  const { data: topic, error: topicError } = await sb
+  let { data: topic, error: topicError } = await sb
     .from('forum_topics')
-    .select('id, title, author_id, created_at')
+    .select('id, title, author_id, created_at, archive_file_id')
     .eq('id', topicId)
     .single();
+  if (topicError) {
+    // database update #11 (document links) not run yet
+    ({ data: topic, error: topicError } = await sb
+      .from('forum_topics')
+      .select('id, title, author_id, created_at')
+      .eq('id', topicId)
+      .single());
+  }
 
   if (topicError || !topic) {
     loading.classList.add('hidden');
@@ -132,8 +147,27 @@ async function loadTopic() {
       <p style="margin:0; font-size:14.5px; line-height:1.6; white-space: pre-wrap;">${escapeHtml(p.body)}</p>
     </div>`).join('');
 
+  await showDocumentLink(topic);
+
   loading.classList.add('hidden');
   content.classList.remove('hidden');
+}
+
+// Topics started from an Archive document link back to it. Older topics
+// (made before the link was stored) are matched by their "Re: <title>" name.
+async function showDocumentLink(topic) {
+  let doc = null;
+  if (topic.archive_file_id) {
+    const { data } = await sb.from('archive_files').select('id, title').eq('id', topic.archive_file_id).single();
+    doc = data;
+  } else if (/^Re:\s+/.test(topic.title || '')) {
+    const { data } = await sb.from('archive_files').select('id, title').eq('title', topic.title.replace(/^Re:\s+/, '')).limit(1);
+    doc = data && data[0];
+  }
+  if (!doc) return;
+  document.getElementById('doc-link-title').textContent = doc.title;
+  document.getElementById('doc-link-btn').href = `archive.html?doc=${encodeURIComponent(doc.id)}`;
+  document.getElementById('doc-link').classList.remove('hidden');
 }
 
 document.getElementById('reply-form').addEventListener('submit', async (e) => {
