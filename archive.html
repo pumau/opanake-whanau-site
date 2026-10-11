@@ -198,7 +198,10 @@ function renderFiles() {
         <div style="font-weight:600; font-size:14.5px;">${escapeHtml(f.title)}</div>
         <div class="help-text" style="margin-top:2px;">${escapeHtml(categoryLabel(f.category))} · dated ${formatDocDate(docDate(f))}</div>
       </div>
-      <a data-path="${escapeHtml(f.storage_path)}" class="btn btn-outline download-link" href="#">Download</a>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a class="btn btn-outline" href="forum.html?cat=Whenua&topic=${encodeURIComponent('Re: ' + f.title)}">Discuss in forum</a>
+        <a data-path="${escapeHtml(f.storage_path)}" class="btn btn-outline download-link" href="#">Download</a>
+      </div>
     </div>`).join('');
 
   document.querySelectorAll('.download-link').forEach((link) => {

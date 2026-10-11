@@ -181,6 +181,29 @@ async function loadForum() {
   document.getElementById('f-category').innerHTML = '<option value="">All categories</option>' + options;
 
   renderForum();
+  prefillFromLink();
+}
+
+// Links from elsewhere on the site (e.g. "Discuss in forum" on an Archive
+// document) can pre-fill the new topic form: ?cat=<category name>&topic=<title>
+function prefillFromLink() {
+  const params = new URLSearchParams(window.location.search);
+  const topic = params.get('topic');
+  const cat = params.get('cat');
+  if (!topic && !cat) return;
+
+  if (cat) {
+    const match = categories.find((c) => c.name.toLowerCase() === cat.toLowerCase());
+    if (match) document.getElementById('nt-category').value = match.id;
+  }
+  if (topic) {
+    document.getElementById('nt-title').value = topic;
+    const docTitle = topic.replace(/^Re:\s*/, '');
+    document.getElementById('nt-body').value = `Kōrero about the Archive document "${docTitle}".\n\n`;
+  }
+  const form = document.getElementById('new-topic-form');
+  form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('nt-body').focus();
 }
 
 document.getElementById('new-topic-form').addEventListener('submit', async (e) => {
