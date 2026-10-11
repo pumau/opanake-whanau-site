@@ -17,6 +17,9 @@ async function initNav() {
   const { data: { session } } = await sb.auth.getSession();
   const pill = document.querySelector('[data-nav="login-pill"]');
   const avatar = document.querySelector('[data-nav="profile-icon"]');
+  const registerLink = document.querySelector('[data-nav="register-link"]');
+  // Signed-in members don't need any Register link, on any page.
+  if (registerLink) registerLink.classList.toggle('hidden', !!session);
   if (session) {
     if (pill) pill.classList.add('hidden');
     if (avatar) avatar.style.display = 'flex';
