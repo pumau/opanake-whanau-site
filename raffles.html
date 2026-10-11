@@ -153,7 +153,6 @@ function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
 
 function urgencyHtml(r, t) {
   if (r.status !== 'open') return '';
-  const entrants = t.total_entrants || 0;
   const tickets = t.total_tickets || 0;
   let line = '';
   let urgent = false;
@@ -165,9 +164,9 @@ function urgencyHtml(r, t) {
     else if (d <= 7) { line = 'Only ' + plural(d, 'day') + ' left to get your tickets'; urgent = true; }
     else { line = 'The draw is in ' + d + ' days'; }
   }
-  const proof = entrants > 0
-    ? plural(entrants, 'whānau member') + ' ' + (entrants === 1 ? 'is' : 'are') + ' already in with ' + plural(tickets, 'ticket') + ' in the draw'
-    : 'No one has entered yet. Be the first in';
+  const proof = tickets > 0
+    ? plural(tickets, 'ticket') + ' already purchased'
+    : 'No tickets purchased yet. Be the first in';
   const style = urgent
     ? 'background: var(--accent-2-soft); border: 1px solid var(--accent-2); color: var(--ink);'
     : 'background: var(--river-soft); border: 1px solid var(--river); color: var(--ink);';
@@ -210,13 +209,12 @@ function myTicketsHtml(r, mine) {
 
 function getTicketsHtml(r, t, mine) {
   if (r.status === 'open') {
-    const entrants = t.total_entrants || 0;
     const totalTickets = t.total_tickets || 0;
     const mineQty = sumQty(mine);
     const nudge = mineQty > 0
       ? `You're in with ${plural(mineQty, 'ticket')} out of ${totalTickets}. Every extra ticket improves your chances.`
-      : entrants > 0
-        ? `${plural(entrants, 'whānau member')} ${entrants === 1 ? 'has' : 'have'} already entered. Don't miss out.`
+      : totalTickets > 0
+        ? `${plural(totalTickets, 'ticket')} already purchased. Don't miss out.`
         : 'Be the first to get a ticket in the draw.';
     return `
       <div class="card-muted" style="border-radius:14px; padding:20px;">
@@ -371,14 +369,8 @@ async function renderRaffles() {
   }));
 
   listEl.innerHTML = raffles.map((r) => {
-    let t = totalsById[r.id] || { total_tickets: 0, total_entrants: 0 };
+    const t = totalsById[r.id] || { total_tickets: 0, total_entrants: 0 };
     const rEntries = entries.filter((e) => e.raffle_id === r.id);
-    // Admins can see every entry, so count people straight from those
-    // (members and guests alike). Everyone else uses the database totals.
-    if (isAdmin) {
-      const holders = new Set(rEntries.map((e) => e.member_id || ('guest:' + String(e.guest_name || '').trim().toLowerCase())));
-      t = { total_tickets: sumQty(rEntries), total_entrants: holders.size };
-    }
     const mine = rEntries.filter((e) => e.member_id === session.user.id);
 
     return `
@@ -392,7 +384,7 @@ async function renderRaffles() {
             </div>
             ${r.description ? `<p style="margin-top:8px; font-size:14px;">${escapeHtml(r.description)}</p>` : ''}
             ${urgencyHtml(r, t)}
-            <p class="help-text" style="margin-top:6px;">${money(r.ticket_price_cents)} per ticket${r.draw_date ? (r.status === 'drawn' ? ' · drawn ' : ' · draw ') + formatDate(r.draw_date) : ''} · ${t.total_tickets || 0} ticket${(t.total_tickets || 0) === 1 ? '' : 's'} sold</p>
+            <p class="help-text" style="margin-top:6px;">${money(r.ticket_price_cents)} per ticket${r.draw_date ? (r.status === 'drawn' ? ' · drawn ' : ' · draw ') + formatDate(r.draw_date) : ''} ${r.status === 'open' ? '' : ' · ' + plural(t.total_tickets || 0, 'ticket') + ' sold'}</p>
             ${r.status === 'drawn' && r.winner_name ? `<p style="margin-top:8px; font-weight:600; color: var(--accent-dark);">Winner: ${escapeHtml(r.winner_name)}</p>` : ''}
             ${myTicketsHtml(r, mine)}
           </div>
