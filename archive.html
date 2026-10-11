@@ -52,7 +52,7 @@
 <div class="filter-bar">
 <input id="f-search" type="text" placeholder="Search titles…">
 <select id="f-category"><option value="">All categories</option></select>
-<label class="help-text" style="display:flex; align-items:center; gap:6px;">From <input id="f-from" type="date"></label>
+<label class="help-text" style="display:flex; align-items:center; gap:6px;">Dated from <input id="f-from" type="date"></label>
 <label class="help-text" style="display:flex; align-items:center; gap:6px;">To <input id="f-to" type="date"></label>
 <button type="button" id="f-clear" class="btn btn-outline" style="padding: 8px 14px; font-size: 13px;">Clear</button>
 </div>
@@ -76,6 +76,11 @@
 <div class="field hidden" id="up-new-category-field">
 <label for="up-new-category">New category name</label>
 <input id="up-new-category" type="text" placeholder="e.g. Succession paperwork">
+</div>
+<div class="field">
+<label for="up-date">Document date</label>
+<input id="up-date" type="date" required>
+<span class="help-text">The date on the document itself, such as the meeting or court date.</span>
 </div>
 <div class="field">
 <label for="up-file">File</label>
@@ -112,6 +117,24 @@ const defaultCategories = { minutes: 'Meeting minutes', land_court: 'Māori Land
 const NEW_CATEGORY = '__new__';
 let allFiles = [];
 let session = null;
+let docDatesSupported = true; // false until database update #9 has been run
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+// The date a document is "dated": the date entered on upload, or for older
+// files without one, the day they were uploaded.
+function docDate(f) {
+  if (f.document_date) return f.document_date;
+  const d = new Date(f.uploaded_at);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+function formatDocDate(str) {
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
 function categoryLabel(value) {
   return defaultCategories[value] || value;
@@ -149,7 +172,7 @@ function renderFiles() {
   const files = allFiles.filter((f) => {
     if (category && f.category !== category) return false;
     if (search && !(f.title || '').toLowerCase().includes(search)) return false;
-    const day = (f.uploaded_at || '').slice(0, 10);
+    const day = docDate(f);
     if (from && day < from) return false;
     if (to && day > to) return false;
     return true;
@@ -167,11 +190,13 @@ function renderFiles() {
     return;
   }
 
+  files.sort((a, b) => docDate(b).localeCompare(docDate(a)));
+
   listEl.innerHTML = files.map((f) => `
     <div class="card" style="display:flex; justify-content:space-between; align-items:center; gap: 16px; flex-wrap: wrap; padding: 18px 22px;">
       <div>
         <div style="font-weight:600; font-size:14.5px;">${escapeHtml(f.title)}</div>
-        <div class="help-text" style="margin-top:2px;">${escapeHtml(categoryLabel(f.category))} · uploaded ${formatDate(f.uploaded_at)}</div>
+        <div class="help-text" style="margin-top:2px;">${escapeHtml(categoryLabel(f.category))} · dated ${formatDocDate(docDate(f))}</div>
       </div>
       <a data-path="${escapeHtml(f.storage_path)}" class="btn btn-outline download-link" href="#">Download</a>
     </div>`).join('');
@@ -191,10 +216,19 @@ function renderFiles() {
 }
 
 async function loadFiles() {
-  const { data: files, error } = await sb
+  let { data: files, error } = await sb
     .from('archive_files')
-    .select('id, title, category, storage_path, uploaded_at')
+    .select('id, title, category, storage_path, uploaded_at, document_date')
     .order('uploaded_at', { ascending: false });
+  if (error) {
+    docDatesSupported = false;
+    ({ data: files, error } = await sb
+      .from('archive_files')
+      .select('id, title, category, storage_path, uploaded_at')
+      .order('uploaded_at', { ascending: false }));
+  } else {
+    docDatesSupported = true;
+  }
 
   if (error || !files) {
     document.getElementById('file-list').innerHTML = '<p class="error-text">Could not load the archive right now.</p>';
@@ -225,6 +259,7 @@ async function init() {
     document.getElementById('up-new-category-field').classList.toggle('hidden', e.target.value !== NEW_CATEGORY);
   });
 
+  document.getElementById('up-date').value = todayStr();
   refreshCategoryControls();
   await loadFiles();
 }
@@ -237,11 +272,18 @@ document.getElementById('up-submit').addEventListener('click', async () => {
   const title = document.getElementById('up-title').value.trim();
   let category = document.getElementById('up-category').value;
   if (category === NEW_CATEGORY) category = document.getElementById('up-new-category').value.trim();
+  const documentDate = document.getElementById('up-date').value;
   const fileInput = document.getElementById('up-file');
   const file = fileInput.files[0];
 
-  if (!title || !file || !category) {
-    errorEl.textContent = 'Add a title, a category and choose a file first.';
+  if (!title || !file || !category || !documentDate) {
+    errorEl.textContent = 'Add a title, a category, the document date and choose a file first.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  if (!docDatesSupported) {
+    errorEl.textContent = 'Document dates need database update #9 to be run in Supabase first.';
     errorEl.classList.remove('hidden');
     return;
   }
@@ -263,6 +305,7 @@ document.getElementById('up-submit').addEventListener('click', async () => {
   const { error: insertError } = await sb.from('archive_files').insert({
     title,
     category,
+    document_date: documentDate,
     storage_path: storagePath,
     uploaded_by: session.user.id
   });
@@ -279,6 +322,7 @@ document.getElementById('up-submit').addEventListener('click', async () => {
   }
 
   document.getElementById('up-title').value = '';
+  document.getElementById('up-date').value = todayStr();
   document.getElementById('up-new-category').value = '';
   document.getElementById('up-new-category-field').classList.add('hidden');
   fileInput.value = '';
