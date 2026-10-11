@@ -74,6 +74,11 @@
 <label for="nr-draw-date">Draw date (optional)</label>
 <input id="nr-draw-date" type="date">
 </div>
+<div class="field">
+<label for="nr-image">Prize photo (optional)</label>
+<input id="nr-image" type="file" accept="image/*">
+<span class="help-text">So people can see what they could win.</span>
+</div>
 <div id="nr-error" class="error-text hidden"></div>
 <button type="submit" id="nr-submit" class="btn">Add raffle</button>
 </form>
@@ -101,12 +106,25 @@ function formatDate(d) {
 let session = null;
 let isAdmin = false;
 
+// Uploads a prize photo to the private "raffles" bucket and returns its
+// storage path, or null (after alerting) if the upload failed.
+async function uploadRaffleImage(file) {
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${Date.now()}-${safeName}`;
+  const { error } = await sb.storage.from('raffles').upload(path, file);
+  if (error) {
+    alert("Couldn't upload the photo — " + error.message);
+    return null;
+  }
+  return path;
+}
+
 const statusLabels = { open: 'Open', closed: 'Entries closed', drawn: 'Drawn' };
 
 async function renderRaffles() {
   const { data: raffles, error } = await sb
     .from('raffles')
-    .select('id, title, description, ticket_price_cents, draw_date, status, winner_name, created_at')
+    .select('id, title, description, ticket_price_cents, draw_date, status, winner_name, image_path, created_at')
     .order('created_at', { ascending: false });
 
   const listEl = document.getElementById('raffle-list');
@@ -129,11 +147,18 @@ async function renderRaffles() {
     (entries || []).forEach((e) => { myEntries[e.raffle_id] = (myEntries[e.raffle_id] || 0) + e.quantity; });
   }
 
+  const imageUrls = {};
+  await Promise.all(raffles.filter((r) => r.image_path).map(async (r) => {
+    const { data: signed } = await sb.storage.from('raffles').createSignedUrl(r.image_path, 3600);
+    if (signed) imageUrls[r.id] = signed.signedUrl;
+  }));
+
   listEl.innerHTML = raffles.map((r) => {
     const t = totalsById[r.id] || { total_tickets: 0, total_entrants: 0 };
     const mine = myEntries[r.id] || 0;
     return `
       <div class="card">
+        ${imageUrls[r.id] ? `<img src="${escapeHtml(imageUrls[r.id])}" alt="Prize: ${escapeHtml(r.title)}" style="width:100%; max-height:320px; object-fit:cover; border-radius:10px; display:block; margin-bottom:16px;">` : ''}
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
           <div>
             <div style="display:flex; align-items:center; gap:10px;">
@@ -152,9 +177,12 @@ async function renderRaffles() {
             </div>` : ''}
         </div>
         ${isAdmin ? `
-          <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:flex; gap:10px;">
+          <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             ${r.status === 'open' ? `<button type="button" class="btn btn-outline close-raffle" data-raffle-id="${r.id}">Close entries</button>` : ''}
             ${r.status === 'closed' ? `<button type="button" class="btn draw-raffle" data-raffle-id="${r.id}">Draw winner</button>` : ''}
+            <label class="help-text" style="display:flex; align-items:center; gap:8px; margin-left:auto;">${r.image_path ? 'Change photo' : 'Add photo'}
+              <input type="file" accept="image/*" class="raffle-image-input" data-raffle-id="${r.id}" data-old-path="${escapeHtml(r.image_path || '')}" style="font-size:12px; max-width:200px;">
+            </label>
           </div>` : ''}
       </div>`;
   }).join('');
@@ -174,6 +202,26 @@ async function renderRaffles() {
         alert(insertError.message);
         return;
       }
+      await renderRaffles();
+    });
+  });
+
+  document.querySelectorAll('.raffle-image-input').forEach((input) => {
+    input.addEventListener('change', async () => {
+      const file = input.files[0];
+      if (!file) return;
+      const raffleId = input.getAttribute('data-raffle-id');
+      const oldPath = input.getAttribute('data-old-path');
+      input.disabled = true;
+      const path = await uploadRaffleImage(file);
+      if (!path) { input.disabled = false; return; }
+      const { error: updateError } = await sb.from('raffles').update({ image_path: path }).eq('id', raffleId);
+      if (updateError) {
+        alert("Couldn't save the photo — " + updateError.message);
+        input.disabled = false;
+        return;
+      }
+      if (oldPath) await sb.storage.from('raffles').remove([oldPath]);
       await renderRaffles();
     });
   });
@@ -245,11 +293,23 @@ document.getElementById('add-raffle-form').addEventListener('submit', async (e) 
   btn.disabled = true;
   btn.textContent = 'Adding…';
 
+  let imagePath = null;
+  const imageFile = document.getElementById('nr-image').files[0];
+  if (imageFile) {
+    imagePath = await uploadRaffleImage(imageFile);
+    if (!imagePath) {
+      btn.disabled = false;
+      btn.textContent = 'Add raffle';
+      return;
+    }
+  }
+
   const { error } = await sb.from('raffles').insert({
     title,
     description: description || null,
     ticket_price_cents: Math.round(priceNzd * 100),
-    draw_date: drawDate || null
+    draw_date: drawDate || null,
+    image_path: imagePath
   });
 
   btn.disabled = false;
