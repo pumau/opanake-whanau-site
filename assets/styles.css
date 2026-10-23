@@ -157,13 +157,14 @@ main{ flex: 1; width: 100%; }
   margin: 0 0 20px;
   border-radius: 12px;
 }
-.hero-split{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr); gap: 32px; align-items: center; padding-bottom: 56px; }
-.polaroids{ position: relative; width: 100%; max-width: 640px; aspect-ratio: 1.55 / 1; justify-self: end; }
+.hero-split{ display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 40px; align-items: center; padding-bottom: 56px; }
+.polaroids{ position: relative; width: 100%; max-width: 1040px; aspect-ratio: 1.3 / 1; justify-self: end; }
 .polaroid{
   position: absolute; margin: 0;
-  left: var(--x); top: var(--y);
-  width: 40%;
-  padding: 3.2% 3.2% 0;
+  left: calc(var(--i) * 20% + var(--row) * 10%);
+  top: calc(var(--row) * 46% + var(--j));
+  width: 30%;
+  padding: 2.2% 2.2% 0;
   background: #fbf9f4;
   border-radius: 3px;
   box-shadow: 0 4px 14px rgba(42,36,32,0.28), 0 1px 3px rgba(42,36,32,0.2);
@@ -174,10 +175,16 @@ main{ flex: 1; width: 100%; }
 .polaroid::after{ content: ""; display: block; padding-bottom: 20%; }
 .polaroid img{ display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover; object-position: var(--pos, center); background: var(--surface-2); }
 .polaroid:nth-child(1){ z-index: 1; } .polaroid:nth-child(2){ z-index: 2; } .polaroid:nth-child(3){ z-index: 3; } .polaroid:nth-child(4){ z-index: 4; }
-.polaroid:hover{ z-index: 10; transform: rotate(0deg) scale(1.07); box-shadow: 0 10px 28px rgba(42,36,32,0.38); }
+.polaroid:nth-child(5){ z-index: 5; } .polaroid:nth-child(6){ z-index: 6; } .polaroid:nth-child(7){ z-index: 7; } .polaroid:nth-child(8){ z-index: 8; }
+.polaroid:hover{ z-index: 20; transform: rotate(0deg) scale(1.07); box-shadow: 0 10px 28px rgba(42,36,32,0.38); }
 @media (max-width: 900px){
   .hero-split{ grid-template-columns: 1fr; }
-  .polaroids{ justify-self: center; max-width: 520px; }
+  .polaroids{ justify-self: center; max-width: 560px; }
+}
+@media (max-width: 640px){
+  .polaroids{ aspect-ratio: 1.45 / 1; }
+  .polaroid{ width: 40%; padding: 3% 3% 0; }
+  .polaroid:nth-child(n+5){ display: none; }
 }
 .lightbox{
   position: fixed; inset: 0; z-index: 100;
