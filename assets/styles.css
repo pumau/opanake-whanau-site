@@ -163,7 +163,7 @@ main{ flex: 1; width: 100%; }
   position: absolute; margin: 0;
   left: calc(var(--i) * 20% + var(--row) * 10%);
   top: calc(var(--row) * 46% + var(--j));
-  width: 30%;
+  width: 34%;
   padding: 2.2% 2.2% 0;
   background: #fbf9f4;
   border-radius: 3px;
@@ -182,9 +182,9 @@ main{ flex: 1; width: 100%; }
   .polaroids{ justify-self: center; max-width: 560px; }
 }
 @media (max-width: 640px){
-  .polaroids{ aspect-ratio: 1.45 / 1; }
+  .polaroids{ aspect-ratio: 1.8 / 1; }
   .polaroid{ width: 40%; padding: 3% 3% 0; }
-  .polaroid:nth-child(n+5){ display: none; }
+  .polaroid:nth-child(n+4){ display: none; }
 }
 .lightbox{
   position: fixed; inset: 0; z-index: 100;
