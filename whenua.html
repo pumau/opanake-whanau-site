@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Whenua ideas | Ōpanake 1C South 6B</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="header">
+<a href="index.html" class="logo">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V6"/><path d="M12 6c0-3 2.5-4.5 5-4.5-0.5 3-2.5 5-5 5"/><path d="M12 10c0-3 2.8-4.7 5.6-4.7-0.6 3.1-2.8 5.2-5.6 5.2"/><path d="M12 6c0-3-2.5-4.5-5-4.5 0.5 3 2.5 5 5 5"/><path d="M12 10c0-3-2.8-4.7-5.6-4.7 0.6 3.1 2.8 5.2 5.6 5.2"/></svg>
+Ōpanake 1C South 6B
+</a>
+<nav class="nav">
+<a href="index.html">Home</a>
+<a href="whakapapa.html">Whakapapa</a>
+<a href="history.html">History</a>
+<a href="events.html">Events &amp; Meetings</a>
+<a href="whenua.html" class="active">Whenua ideas</a>
+<a href="forum.html">Forum</a>
+<a href="archive.html">Archive</a>
+<a href="photos.html">Photos</a>
+<a href="raffles.html">Raffles</a>
+<a href="register.html" class="pill" data-nav="login-pill">Register / Login</a>
+<a href="profile.html" class="avatar" data-nav="profile-icon">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+</a>
+</nav>
+</header>
+
+<main>
+
+<div id="access-gate" class="container hidden" style="padding: 40px 56px 56px;">
+<div class="card" style="max-width: 520px; margin: 0 auto; text-align:center;">
+<h2 id="access-gate-title" style="font-size:19px;">—</h2>
+<p id="access-gate-text" style="margin-top:10px;"></p>
+<a id="access-gate-btn" href="register.html" class="btn" style="margin-top:14px; display:inline-flex;">Register / log in</a>
+</div>
+</div>
+
+<div id="page-content" class="hidden">
+<div class="hero" style="text-align: center; padding-bottom: 8px;">
+<div class="eyebrow">Whenua ideas</div>
+<h1 style="font-size: 34px; margin-top: 8px; max-width: 720px; margin-left: auto; margin-right: auto;">Got an idea for our whenua? Think it through first</h1>
+<p style="margin-left: auto; margin-right: auto;">Every good idea is welcome. These questions help you work out what needs thinking about before you bring it to whānau. You do not need all the answers. "I don't know yet" is a useful answer, because it shows what to find out next.</p>
+</div>
+
+<div class="container idea-wrap">
+<div class="idea-actions no-print">
+<button class="btn" id="copy-btn" type="button">Copy as text</button>
+<button class="btn btn-outline" id="print-btn" type="button">Print</button>
+<button class="btn btn-outline" id="clear-btn" type="button">Clear all</button>
+<span id="idea-msg" class="help-text" role="status"></span>
+</div>
+<p class="help-text no-print" style="margin: 0 0 18px;">Nothing you type here is saved to the site. Copy it into a new Forum topic, an email or a document when you are ready to share it, or print it to take to a hui.</p>
+
+<div class="card idea-title-card" style="margin-bottom:14px;">
+<div class="field" style="margin:0;">
+<label for="idea-name">Name of your idea</label>
+<input id="idea-name" type="text" placeholder="e.g. Whānau campsite by the river">
+</div>
+<div class="field" style="margin:14px 0 0;">
+<label for="idea-by">Your name and branch</label>
+<input id="idea-by" type="text" placeholder="e.g. Aroha, descendant of ...">
+</div>
+</div>
+
+<section class="card idea-q" style="margin-bottom:14px;">
+<div class="idea-num">1</div>
+<div style="flex:1; min-width:0;">
+<h2 style="font-size:17px; margin:0;">The idea</h2>
+<label for="q1" style="display:block; font-weight:600; margin:6px 0 2px;">What is your idea, in a sentence or two?</label>
+<div class="help-text" style="margin-bottom:8px;">Give it a short name. For example: "Whānau campsite near the river" or "Plant a rongoā garden". Keep it simple.</div>
+<textarea id="q1" data-title="The idea" data-q="What is your idea, in a sentence or two?" rows="4" class="idea-input"></textarea>
+</div>
+</section>
+<section class="card idea-q" style="margin-bottom:14px;">
+<div class="idea-num">2</div>
+<div style="flex:1; min-width:0;">
+<h2 style="font-size:17px; margin:0;">Who it is for</h2>
+<label for="q2" style="display:block; font-weight:600; margin:6px 0 2px;">Who in the whānau would benefit, and how?</label>
+<div class="help-text" style="margin-bottom:8px;">Think about income, housing, kai, jobs, learning, getting home to the whenua, or looking after the land. Which branches or generations would feel it most?</div>
+<textarea id="q2" data-title="Who it is for" data-q="Who in the whānau would benefit, and how?" rows="4" class="idea-input"></textarea>
+</div>
+</section>
+<section class="card idea-q" style="margin-bottom:14px;">
+<div class="idea-num">3</div>
+<div style="flex:1; min-width:0;">
+<h2 style="font-size:17px; margin:0;">Where on the whenua</h2>
+<label for="q3" style="display:block; font-weight:600; margin:6px 0 2px;">Which part of the land is this for?</label>
+<div class="help-text" style="margin-bottom:8px;">Roughly where, and how big. Is it one block or the whole whenua? Is the land flat, wet, steep, covered in bush or already used for something?</div>
+<textarea id="q3" data-title="Where on the whenua" data-q="Which part of the land is this for?" rows="4" class="idea-input"></textarea>
+</div>
+</section>
+<section class="card idea-q" style="margin-bottom:14px;">
+<div class="idea-num">4</div>
+<div style="flex:1; min-width:0;">
+<h2 style="font-size:17px; margin:0;">Land status and rules</h2>
+<label for="q4" style="display:block; font-weight:600; margin:6px 0 2px;">What do we know about the rules that apply to the land?</label>
+<div class="help-text" style="margin-bottom:8px;">Who owns it and in what shares? Are there leases, covenants or rights of way already? Would the council need to approve it (resource consent, building consent)? If you do not know, say so. That is a fine answer and a good first thing to find out.</div>
+<textarea id="q4" data-title="Land status and rules" data-q="What do we know about the rules that apply to the land?" rows="4" class="idea-input"></textarea>
+</div>
+</section>
+<section class="card idea-q" style="margin-bottom:14px;">
+<div class="idea-num">5</div>
+<div style="flex:1; min-width:0;">
+<h2 style="font-size:17px; margin:0;">Access and services</h2>
+<label for="q5" style="display:block; font-weight:600; margin:6px 0 2px;">Can people get there, and what services would it need?</label>
+<div class="help-text" style="margin-bottom:8px;">Road and parking, power, water, toilets or wastewater, phone or internet. Would anything need to be built or upgraded?</div>
+<textarea id="q5" data-title="Access and services" data-q="Can people get there, and what services would it need?" rows="4" class="idea-input"></textarea>
+</div>
+</section>
+<section class="card idea-q" style="margin-bottom:14px;">
+<div class="idea-num">6</div>
+<div style="flex:1; min-width:0;">
+<h2 style="font-size:17px; margin:0;">Rough costs and money</h2>
+<label for="q6" style="display:block; font-weight:600; margin:6px 0 2px;">What might it cost to start, and to keep going?</label>
+<div class="help-text" style="margin-bottom:8px;">A ballpark is enough. What would you need to buy or build? Who might pay (whānau contributions, grants, a loan)? Could it earn money, and who would that money go to?</div>
+<textarea id="q6" data-title="Rough costs and money" data-q="What might it cost to start, and to keep going?" rows="4" class="idea-input"></textarea>
+</div>
+</section>
+<section class="card idea-q" style="margin-bottom:14px;">
+<div class="idea-num">7</div>
+<div style="flex:1; min-width:0;">
+<h2 style="font-size:17px; margin:0;">People and time</h2>
+<label for="q7" style="display:block; font-weight:600; margin:6px 0 2px;">Who would lead it, and who else needs to be involved?</label>
+<div class="help-text" style="margin-bottom:8px;">Who would actually do the work week to week? What skills do you have, and which do you need? Be honest about how much time people can give.</div>
+<textarea id="q7" data-title="People and time" data-q="Who would lead it, and who else needs to be involved?" rows="4" class="idea-input"></textarea>
+</div>
+</section>
+<section class="card idea-q" style="margin-bottom:14px;">
+<div class="idea-num">8</div>
+<div style="flex:1; min-width:0;">
+<h2 style="font-size:17px; margin:0;">Risks and impact</h2>
+<label for="q8" style="display:block; font-weight:600; margin:6px 0 2px;">What could go wrong, and who or what could be affected?</label>
+<div class="help-text" style="margin-bottom:8px;">Think about neighbours, awa and waterways, native bush, wāhi tapu, and the effect on other owners. What would you do to reduce each risk?</div>
+<textarea id="q8" data-title="Risks and impact" data-q="What could go wrong, and who or what could be affected?" rows="4" class="idea-input"></textarea>
+</div>
+</section>
+<section class="card idea-q" style="margin-bottom:14px;">
+<div class="idea-num">9</div>
+<div style="flex:1; min-width:0;">
+<h2 style="font-size:17px; margin:0;">Tikanga and whānau</h2>
+<label for="q9" style="display:block; font-weight:600; margin:6px 0 2px;">Who should be talked to first, and how does this fit our values?</label>
+<div class="help-text" style="margin-bottom:8px;">Which kaumātua or branch representatives should hear it before the wider whānau? How does it show manaakitanga and kaitiakitanga, and leave the whenua in good shape for the next generations?</div>
+<textarea id="q9" data-title="Tikanga and whānau" data-q="Who should be talked to first, and how does this fit our values?" rows="4" class="idea-input"></textarea>
+</div>
+</section>
+<section class="card idea-q" style="margin-bottom:14px;">
+<div class="idea-num">10</div>
+<div style="flex:1; min-width:0;">
+<h2 style="font-size:17px; margin:0;">First steps</h2>
+<label for="q10" style="display:block; font-weight:600; margin:6px 0 2px;">What is the smallest first step, and what happens next?</label>
+<div class="help-text" style="margin-bottom:8px;">A trial, a working bee, a quote, a conversation with the council. What could happen in the next three months, and what would tell us it is worth carrying on?</div>
+<textarea id="q10" data-title="First steps" data-q="What is the smallest first step, and what happens next?" rows="4" class="idea-input"></textarea>
+</div>
+</section>
+<section class="card idea-q" style="margin-bottom:14px;">
+<div class="idea-num">11</div>
+<div style="flex:1; min-width:0;">
+<h2 style="font-size:17px; margin:0;">What you need from whānau</h2>
+<label for="q11" style="display:block; font-weight:600; margin:6px 0 2px;">What are you asking whānau for?</label>
+<div class="help-text" style="margin-bottom:8px;">Feedback, a decision in principle, volunteers, money, or just permission to look into it further?</div>
+<textarea id="q11" data-title="What you need from whānau" data-q="What are you asking whānau for?" rows="4" class="idea-input"></textarea>
+</div>
+</section>
+
+<div class="card card-muted" style="margin-top:6px;">
+<p style="margin:0; font-size:13.5px;">This is a thinking tool, not legal or financial advice. Rules about Māori land, council consents and money can be tricky. Before spending any money or making promises, check the details with the right people, such as a lawyer, the Māori Land Court, the council, or an accountant.</p>
+</div>
+</div>
+</div>
+</main>
+
+<footer class="footer">
+<img class="footer-map" src="assets/footer-map.jpg" alt="Aerial map of the Ōpanake 1C South blocks near Mamaranui, Kaihu" loading="lazy">
+© Ōpanake 1C South 6B whānau
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-client.js"></script>
+<script>
+async function init() {
+  const status = await initAccessGate();
+  if (status.approved) document.getElementById('page-content').classList.remove('hidden');
+}
+init();
+
+(function () {
+  const msg = document.getElementById('idea-msg');
+  const say = (t) => { msg.textContent = t; setTimeout(() => { msg.textContent = ''; }, 3000); };
+  function asText() {
+    const name = document.getElementById('idea-name').value.trim();
+    const by = document.getElementById('idea-by').value.trim();
+    let out = 'WHENUA IDEA: ' + (name || '(untitled)') + '\n';
+    if (by) out += 'From: ' + by + '\n';
+    document.querySelectorAll('.idea-input').forEach((t, i) => {
+      out += '\n' + (i + 1) + '. ' + t.dataset.title + '\n' + t.dataset.q + '\n' + (t.value.trim() || '(not answered yet)') + '\n';
+    });
+    return out;
+  }
+  document.getElementById('copy-btn').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(asText()); say('Copied. Paste it into a Forum topic or email.'); }
+    catch (e) { say('Could not copy. Select the text and copy it yourself.'); }
+  });
+  document.getElementById('print-btn').addEventListener('click', () => window.print());
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    if (!confirm('Clear everything you have typed on this page?')) return;
+    document.querySelectorAll('#page-content textarea, #page-content input').forEach((el) => { el.value = ''; });
+  });
+})();
+</script>
+</body>
+</html>
