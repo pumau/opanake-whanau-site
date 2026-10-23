@@ -310,3 +310,17 @@ main{ flex: 1; width: 100%; }
 /* Home page: Irihapeti's story under the heading */
 .hero-text p + p{ margin-top: 12px; }
 .hero-text p a{ color: var(--accent-dark); text-decoration: underline; }
+
+/* Archive: in-page document viewer (view only) */
+.viewer{ position: fixed; inset: 0; z-index: 100; background: #2a2420; display: flex; flex-direction: column; }
+.viewer.hidden{ display: none; }
+.viewer-bar{ display: flex; align-items: center; gap: 14px; padding: 12px 20px; background: var(--accent-dark); color: #EEEBE4; }
+.viewer-title{ font-family: 'Fraunces', serif; font-size: 17px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-note{ font-size: 12px; letter-spacing: 1px; text-transform: uppercase; opacity: 0.7; }
+.viewer-close{ background: none; color: #EEEBE4; border-color: rgba(238,235,228,0.5); }
+.viewer-body{ flex: 1; overflow: auto; padding: 16px 12px 40px; display: flex; flex-direction: column; align-items: center; gap: 14px; -webkit-user-select: none; user-select: none; }
+.viewer-page{ background: #fff; max-width: 100%; height: auto; box-shadow: 0 2px 14px rgba(0,0,0,0.5); }
+.viewer-img{ max-width: 100%; height: auto; box-shadow: 0 2px 14px rgba(0,0,0,0.5); -webkit-user-drag: none; }
+.viewer-text{ background: #fff; color: #222; padding: 24px; max-width: 860px; width: 100%; white-space: pre-wrap; font-size: 14px; line-height: 1.55; box-sizing: border-box; }
+.viewer-msg{ color: #EEEBE4; margin-top: 60px; }
+@media print{ .viewer{ display: none !important; } }

@@ -100,6 +100,16 @@
 © Ōpanake 1C South 6B whānau
 </footer>
 
+
+<div id="doc-viewer" class="viewer hidden" role="dialog" aria-modal="true" aria-label="Document viewer">
+  <div class="viewer-bar">
+    <div id="doc-viewer-title" class="viewer-title"></div>
+    <div class="viewer-note">View only</div>
+    <button type="button" class="btn btn-outline viewer-close" id="doc-viewer-close">Close</button>
+  </div>
+  <div id="doc-viewer-body" class="viewer-body"></div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supabase-client.js"></script>
 <script>
@@ -107,6 +117,94 @@ function escapeHtml(s) {
   const div = document.createElement('div');
   div.textContent = s == null ? '' : s;
   return div.innerHTML;
+}
+
+
+// Members can read documents in the page without being offered a download.
+// PDFs are drawn page by page with PDF.js; images and text are shown directly.
+// (This stops casual saving. Anything a person can see on screen can still be
+// screenshotted, so only upload what members are fine to read.)
+const VIEWABLE = /\.(pdf|jpe?g|png|gif|webp|txt)$/i;
+function canView(path) { return VIEWABLE.test(path || ''); }
+const MIME = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', txt: 'text/plain' };
+const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+let viewerUrl = null;
+let pdfLoading = null;
+
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve();
+  if (!pdfLoading) {
+    pdfLoading = new Promise((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = PDFJS + 'pdf.min.js';
+      el.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; resolve(); };
+      el.onerror = () => { pdfLoading = null; reject(new Error('pdf.js failed to load')); };
+      document.head.appendChild(el);
+    });
+  }
+  return pdfLoading;
+}
+
+function closeViewer() {
+  const v = document.getElementById('doc-viewer');
+  v.classList.add('hidden');
+  document.getElementById('doc-viewer-body').innerHTML = '';
+  if (viewerUrl) { URL.revokeObjectURL(viewerUrl); viewerUrl = null; }
+  document.body.style.overflow = '';
+}
+
+async function openViewer(path, title) {
+  const v = document.getElementById('doc-viewer');
+  const body = document.getElementById('doc-viewer-body');
+  document.getElementById('doc-viewer-title').textContent = title || 'Document';
+  body.innerHTML = '<p class="viewer-msg">Opening document...</p>';
+  v.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  const ext = (path.split('.').pop() || '').toLowerCase();
+  try {
+    const { data, error } = await sb.storage.from('archive').download(path);
+    if (error || !data) throw error || new Error('no file');
+    if (ext === 'pdf') {
+      await loadPdfJs();
+      const pdf = await window.pdfjsLib.getDocument({ data: await data.arrayBuffer() }).promise;
+      body.innerHTML = '';
+      const width = Math.min(body.clientWidth - 24, 980);
+      const ratio = window.devicePixelRatio || 1;
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(async (en) => {
+          if (!en.isIntersecting) return;
+          const c = en.target; io.unobserve(c);
+          const page = await pdf.getPage(Number(c.dataset.page));
+          const base = page.getViewport({ scale: 1 });
+          const vp = page.getViewport({ scale: (width / base.width) * ratio });
+          c.width = vp.width; c.height = vp.height;
+          await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+        });
+      }, { root: body, rootMargin: '600px 0px' });
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const first = await pdf.getPage(i);
+        const b = first.getViewport({ scale: 1 });
+        const c = document.createElement('canvas');
+        c.className = 'viewer-page'; c.dataset.page = i;
+        c.style.width = width + 'px'; c.style.aspectRatio = b.width + ' / ' + b.height;
+        body.appendChild(c); io.observe(c);
+      }
+    } else if (ext === 'txt') {
+      body.innerHTML = '';
+      const pre = document.createElement('pre');
+      pre.className = 'viewer-text';
+      pre.textContent = await data.text();
+      body.appendChild(pre);
+    } else {
+      viewerUrl = URL.createObjectURL(new Blob([data], { type: MIME[ext] || 'image/jpeg' }));
+      body.innerHTML = '';
+      const img = document.createElement('img');
+      img.className = 'viewer-img'; img.src = viewerUrl; img.alt = title || ''; img.draggable = false;
+      body.appendChild(img);
+    }
+  } catch (err) {
+    body.innerHTML = '<p class="viewer-msg">Sorry, this document could not be opened right now. Please try again.</p>';
+  }
 }
 
 function formatDate(iso) {
@@ -202,7 +300,8 @@ function fileCardHtml(f) {
       </div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         ${discussLink}
-        <a data-action="download" data-path="${escapeHtml(f.storage_path)}" class="btn btn-outline" href="#">Download</a>
+        ${canView(f.storage_path) ? `<button type="button" class="btn btn-outline" data-action="view" data-path="${escapeHtml(f.storage_path)}" data-title="${escapeHtml(f.title)}">View</button>` : ''}
+        ${(isAdmin || !canView(f.storage_path)) ? `<a data-action="download" data-path="${escapeHtml(f.storage_path)}" class="btn btn-outline" href="#">Download</a>` : ''}
         ${isAdmin ? `<button type="button" class="btn btn-outline" data-action="edit" data-id="${f.id}">Edit</button>
         <button type="button" class="btn btn-outline" data-action="delete" data-id="${f.id}" style="color:#B3492A;">Delete</button>` : ''}
       </div>
@@ -254,6 +353,12 @@ document.getElementById('file-list').addEventListener('click', async (e) => {
   if (!el) return;
   const action = el.getAttribute('data-action');
   const id = el.getAttribute('data-id');
+
+  if (action === 'view') {
+    e.preventDefault();
+    openViewer(el.getAttribute('data-path'), el.getAttribute('data-title'));
+    return;
+  }
 
   if (action === 'download') {
     e.preventDefault();
@@ -477,6 +582,10 @@ document.getElementById('up-submit').addEventListener('click', async () => {
 });
 
 init();
+
+document.getElementById('doc-viewer-close').addEventListener('click', closeViewer);
+document.getElementById('doc-viewer-body').addEventListener('contextmenu', (e) => e.preventDefault());
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeViewer(); });
 </script>
 </body>
 </html>
