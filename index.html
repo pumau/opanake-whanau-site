@@ -48,8 +48,17 @@
 <p>Ōpanake 1C South 6B is our shared whenua at Mamaranui, Kaihu. This site is bringing the nine sibling branches together in one place — for hui, whakapapa, the archive, and each other.</p>
 </div>
 
-<div class="container" style="padding-top: 24px; padding-bottom: 56px; margin-left: 0;">
-<img class="home-photo" src="assets/home-whanau.jpg" alt="Whānau gathered together in a family photograph">
+<div class="container montage-wrap">
+<div class="montage" id="montage">
+      <figure class="montage-item"><img src="assets/whanau-06.jpg" alt="A kuia with five children outside the National Bank of New Zealand" width="781" height="1300" loading="lazy"></figure>
+      <figure class="montage-item"><img src="assets/whanau-04.jpg" alt="Whānau and friends laughing together beside a shed" width="1000" height="748" loading="lazy"></figure>
+      <figure class="montage-item"><img src="assets/whanau-07.jpg" alt="A kuia with a pushchair, a toddler and a baby on a porch" width="780" height="1300" loading="lazy"></figure>
+      <figure class="montage-item"><img src="assets/whanau-03.jpg" alt="A kuia in a hat with four children in a garden" width="1000" height="972" loading="lazy"></figure>
+      <figure class="montage-item"><img src="assets/whanau-01.jpg" alt="Whānau gathered together indoors, a colour snapshot" width="1000" height="998" loading="eager"></figure>
+      <figure class="montage-item"><img src="assets/whanau-02.jpg" alt="Four generations of whānau outside a house, one holding a puppy" width="1000" height="1000" loading="eager"></figure>
+      <figure class="montage-item"><img src="assets/whanau-05.jpg" alt="Portrait of a man in a jacket and checked shirt" width="1000" height="1039" loading="lazy"></figure>
+      <figure class="montage-item"><img src="assets/whanau-08.jpg" alt="A woman laughing on a bench with a cat on her lap" width="1000" height="1000" loading="lazy"></figure>
+    </div>
 </div>
 </div>
 </main>
@@ -59,6 +68,8 @@
 © Ōpanake 1C South 6B whānau
 </footer>
 
+<div id="lightbox" class="lightbox hidden" role="dialog" aria-label="Photo viewer"><img id="lightbox-img" alt=""></div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supabase-client.js"></script>
 <script>
@@ -67,6 +78,22 @@ async function init() {
   if (status.approved) document.getElementById('page-content').classList.remove('hidden');
 }
 init();
+
+// Click a photo to see it larger; click anywhere or press Esc to close.
+(function () {
+  const box = document.getElementById('lightbox');
+  const big = document.getElementById('lightbox-img');
+  document.getElementById('montage').addEventListener('click', (e) => {
+    const img = e.target.closest('img');
+    if (!img) return;
+    big.src = img.src;
+    big.alt = img.alt;
+    box.classList.remove('hidden');
+  });
+  const close = () => box.classList.add('hidden');
+  box.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+})();
 </script>
 </body>
 </html>
