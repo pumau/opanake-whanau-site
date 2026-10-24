@@ -36,7 +36,7 @@
 <div class="hero" style="padding-bottom: 8px;">
 <div class="eyebrow">Shop</div>
 <h1 style="font-size: 32px; margin-top: 8px;">Whānau shop</h1>
-<p>Place an order and we'll follow up with an invoice — no payment on the site yet.</p>
+<p>Place an order, then pay by bank transfer using the details shown once it's in. There are no card payments on the site.</p>
 </div>
 
 <div id="access-gate" class="container hidden" style="padding-top: 12px; padding-bottom: 56px;">
@@ -51,7 +51,8 @@
 <div class="container" style="padding-top: 12px; padding-bottom: 40px;">
 
 <div id="order-success" class="card hidden" style="margin-bottom: 24px; background: var(--river-soft); border: 1px solid var(--river);">
-<p style="margin: 0;">Thanks — your order's in. We'll be in touch with an invoice.</p>
+<p style="margin: 0;">Thanks, your order's in. Please pay by bank transfer using the details below.</p>
+<div id="order-pay"></div>
 </div>
 
 <form id="order-form">
@@ -119,6 +120,7 @@ function formatDate(iso) {
 }
 
 let session = null;
+let myName = '';
 let isAdmin = false;
 let products = [];
 
@@ -203,6 +205,7 @@ document.getElementById('order-form').addEventListener('submit', async (e) => {
   btn.disabled = true;
   btn.textContent = 'Placing order…';
 
+  const orderTotal = total;
   const { error } = await sb.from('orders').insert({
     member_id: session.user.id,
     items,
@@ -221,6 +224,7 @@ document.getElementById('order-form').addEventListener('submit', async (e) => {
   document.getElementById('order-form').reset();
   document.querySelectorAll('.qty-input').forEach((i) => { i.value = 0; });
   updateTotal();
+  document.getElementById('order-pay').innerHTML = payBoxHtml(money(orderTotal), (myName || 'Your name') + ', Shop order');
   document.getElementById('order-success').classList.remove('hidden');
 });
 
@@ -308,7 +312,7 @@ async function loadOrders() {
           <div class="help-text" style="margin-top:2px;">${itemsSummary} · ${formatDate(o.created_at)}</div>
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
-          <span class="badge ${o.status === 'paid' ? 'badge-approved' : 'badge-pending'}">${o.status === 'paid' ? 'Paid' : 'Invoice sent'}</span>
+          <span class="badge ${o.status === 'paid' ? 'badge-approved' : 'badge-pending'}">${o.status === 'paid' ? 'Paid' : 'Awaiting payment'}</span>
           ${o.status !== 'paid' ? `<button type="button" class="btn btn-outline mark-paid" data-order-id="${o.id}">Mark paid</button>` : ''}
         </div>
       </div>`;
@@ -327,6 +331,7 @@ async function init() {
   const status = await initAccessGate();
   if (!status.approved) return;
   session = status.session;
+  myName = (status.profile && status.profile.full_name) || '';
   isAdmin = status.isAdmin;
   document.getElementById('page-content').classList.remove('hidden');
 

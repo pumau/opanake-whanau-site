@@ -132,3 +132,48 @@ function forumErrorText(error, fallback) {
   if (/reword/i.test(msg)) return FORUM_REWORD_MESSAGE;
   return msg || fallback;
 }
+
+// ---- How to pay (bank transfer) ---------------------------------------------
+// Shown to signed-in, approved members only, next to their tickets or order.
+const PAY_ACCOUNT_NAME = 'Embracing the Whenua';
+const PAY_BANK = 'Kiwibank';
+const PAY_ACCOUNT_NUMBER = '38-9000-0502730-17';
+
+function payEsc(v) {
+  const d = document.createElement('div');
+  d.textContent = v == null ? '' : v;
+  return d.innerHTML;
+}
+
+// amountText like "$20.00"; reference like "Jane Smith, Mystery raffle"
+function payBoxHtml(amountText, reference) {
+  const row = (label, value, copy) => `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:7px 0; border-top:1px solid var(--border); font-size:13.5px; flex-wrap:wrap;">
+      <span class="help-text" style="min-width:96px;">${label}</span>
+      <span style="font-weight:600; flex:1; word-break:break-word;">${payEsc(value)}</span>
+      ${copy ? `<button type="button" class="btn btn-outline" data-copy="${payEsc(value)}" style="padding:4px 12px; font-size:12px;">Copy</button>` : ''}
+    </div>`;
+  return `
+    <div class="card" style="margin-top:14px; padding:16px 18px; border:1px solid var(--river); background: var(--river-soft);">
+      <div style="font-weight:600; font-size:14px;">How to pay: ${payEsc(amountText)} by bank transfer</div>
+      <div style="margin-top:8px;">
+        ${row('Account name', PAY_ACCOUNT_NAME, false)}
+        ${row(PAY_BANK, PAY_ACCOUNT_NUMBER, true)}
+        ${row('Reference', reference, true)}
+      </div>
+      <p class="help-text" style="margin-top:8px;">Please use the reference so we can match your payment. We'll mark it as paid once it lands.</p>
+    </div>`;
+}
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest && e.target.closest('button[data-copy]');
+  if (!btn) return;
+  const text = btn.getAttribute('data-copy');
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = 'Copied';
+  } catch (err) {
+    btn.textContent = 'Select and copy';
+  }
+  setTimeout(() => { btn.textContent = 'Copy'; }, 1800);
+});
