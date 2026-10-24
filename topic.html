@@ -68,6 +68,7 @@
 <div class="field">
 <textarea id="reply-body" required rows="4" style="font: inherit; font-size: 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); resize: vertical;"></textarea>
 </div>
+<p class="help-text" style="margin: 0 0 12px;">Ideas and connection are welcome. Swearing and hate speech are not, and are filtered out. See the <a href="forum.html" style="text-decoration: underline;">forum guidelines</a>.</p>
 <div id="reply-error" class="error-text hidden"></div>
 <button type="submit" id="reply-submit" class="btn">Post reply</button>
 </form>
@@ -180,13 +181,22 @@ document.getElementById('reply-form').addEventListener('submit', async (e) => {
   btn.textContent = 'Posting…';
 
   const body = document.getElementById('reply-body').value.trim();
+
+  if (!(await forumTextOk(body))) {
+    errorEl.textContent = FORUM_REWORD_MESSAGE;
+    errorEl.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Post reply';
+    return;
+  }
+
   const { error } = await sb.from('forum_posts').insert({ topic_id: topicId, author_id: session.user.id, body });
 
   btn.disabled = false;
   btn.textContent = 'Post reply';
 
   if (error) {
-    errorEl.textContent = error.message;
+    errorEl.textContent = forumErrorText(error, "Couldn't post that. Please try again.");
     errorEl.classList.remove('hidden');
     return;
   }

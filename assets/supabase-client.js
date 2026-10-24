@@ -108,3 +108,27 @@ function sortBranchesByYear(list) {
     })
     .map((x) => x.b);
 }
+
+// Forum word filter. Asks the database (update #14) whether a draft is fine
+// to post. If the update has not been run yet, or the check can't be reached,
+// it lets the post through (the database still enforces the rule once live).
+const FORUM_REWORD_MESSAGE =
+  "A few of the words in that don't fit our kōrero guidelines. Please reword it and try again. Ideas and connection are always welcome here.";
+
+async function forumTextOk(text) {
+  try {
+    const { data, error } = await sb.rpc('forum_text_ok', { t: text });
+    if (error) return true;
+    return data !== false;
+  } catch (e) {
+    return true;
+  }
+}
+
+// The database refuses filtered posts with a "reword" message. Turn that,
+// and any other error, into something friendly to show.
+function forumErrorText(error, fallback) {
+  const msg = (error && error.message) || '';
+  if (/reword/i.test(msg)) return FORUM_REWORD_MESSAGE;
+  return msg || fallback;
+}

@@ -324,3 +324,9 @@ main{ flex: 1; width: 100%; }
 .viewer-text{ background: #fff; color: #222; padding: 24px; max-width: 860px; width: 100%; white-space: pre-wrap; font-size: 14px; line-height: 1.55; box-sizing: border-box; }
 .viewer-msg{ color: #EEEBE4; margin-top: 60px; }
 @media print{ .viewer{ display: none !important; } }
+
+/* Forum guidelines */
+.guidelines summary{ cursor: pointer; font-weight: 600; font-size: 16px; color: var(--ink); }
+.guidelines[open] summary{ margin-bottom: 12px; }
+.guidelines p{ font-size: 14px; line-height: 1.6; }
+.guidelines p + p{ margin-top: 10px; }
