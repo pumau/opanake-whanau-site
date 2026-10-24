@@ -332,3 +332,14 @@ main{ flex: 1; width: 100%; }
 .topic-card:hover{ transform: translateY(-2px); box-shadow: 0 8px 20px rgba(42,36,32,0.12); }
 .topic-card-title{ font-weight: 600; font-size: 15.5px; line-height: 1.35; color: var(--ink); }
 .topic-card-foot{ margin-top: auto; padding-top: 8px; font-size: 12.5px; font-weight: 600; color: var(--accent-dark); }
+
+/* Resources page link cards */
+.link-grid{ display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.link-card{
+  display: flex; flex-direction: column; gap: 6px; padding: 16px 18px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.link-card:hover{ transform: translateY(-2px); box-shadow: 0 8px 20px rgba(42,36,32,0.12); }
+.link-card-title{ display: flex; justify-content: space-between; gap: 10px; font-weight: 600; font-size: 15px; line-height: 1.35; color: var(--ink); }
+.link-card-arrow{ color: var(--accent-dark); font-weight: 700; flex-shrink: 0; }
