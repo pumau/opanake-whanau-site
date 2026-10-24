@@ -23,6 +23,7 @@ async function initNav() {
   if (session) {
     if (pill) pill.classList.add('hidden');
     if (avatar) avatar.style.display = 'flex';
+    setupViewSwitch(session, avatar);
   } else {
     if (pill) pill.classList.remove('hidden');
     if (avatar) avatar.style.display = 'none';
@@ -31,11 +32,47 @@ async function initNav() {
 
 document.addEventListener('DOMContentLoaded', initNav);
 
+// Admins get a button in the top bar to switch between Admin view and
+// Member view. In Member view the database treats them like any other
+// member, so they see exactly what members see. Needs database update #19.
+async function setupViewSwitch(session, avatar) {
+  if (!avatar || document.getElementById('view-switch')) return;
+  const status = await getMemberStatus();
+  if (!status.isAdminAccount || !status.canSwitchView) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'view-switch';
+  btn.className = 'view-switch' + (status.viewAsMember ? ' is-member' : '');
+  btn.textContent = status.viewAsMember ? 'Member view' : 'Admin view';
+  btn.title = status.viewAsMember
+    ? 'You are seeing the site as a member. Click to go back to Admin view.'
+    : 'Click to see the site as a member sees it.';
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    const { error } = await sb
+      .from('profiles')
+      .update({ view_as_member: !status.viewAsMember })
+      .eq('id', session.user.id);
+    if (error) { btn.disabled = false; return; }
+    window.location.reload();
+  });
+  avatar.parentNode.insertBefore(btn, avatar);
+}
+
 // Full member-status check — not just "signed in", but "signed in AND
 // approved". This site is private: real content only ever renders for an
 // approved member (or an admin, who is always approved too). Every page
 // that shows whānau content should gate on `approved`, not just `session`.
-async function getMemberStatus() {
+// The result is shared by the top bar and the page, so it is only fetched
+// once per page load (and again after signing in or out).
+let memberStatusPromise = null;
+sb.auth.onAuthStateChange((event) => { if (event !== 'INITIAL_SESSION') memberStatusPromise = null; });
+function getMemberStatus() {
+  if (!memberStatusPromise) memberStatusPromise = loadMemberStatus();
+  return memberStatusPromise;
+}
+
+async function loadMemberStatus() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return { session: null, approved: false, isAdmin: false, profile: null };
   const { data: profile } = await sb
@@ -44,8 +81,21 @@ async function getMemberStatus() {
     .eq('id', session.user.id)
     .single();
   const approved = !!profile && profile.status === 'approved';
-  const isAdmin = !!profile && profile.role === 'admin';
-  return { session, approved, isAdmin, profile: profile || null };
+  const isAdminAccount = !!profile && profile.role === 'admin';
+  // Admins can switch to "Member view" (database update #19). Until that has
+  // been run the column doesn't exist, and the switch simply isn't offered.
+  let canSwitchView = false;
+  let viewAsMember = false;
+  if (isAdminAccount) {
+    const { data: v, error: vErr } = await sb
+      .from('profiles')
+      .select('view_as_member')
+      .eq('id', session.user.id)
+      .single();
+    if (!vErr && v) { canSwitchView = true; viewAsMember = !!v.view_as_member; }
+  }
+  const isAdmin = isAdminAccount && !viewAsMember;
+  return { session, approved, isAdmin, isAdminAccount, canSwitchView, viewAsMember, profile: profile || null };
 }
 
 // Shared "members only" gate. Call this near the top of a page's script,

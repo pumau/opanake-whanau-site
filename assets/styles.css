@@ -358,3 +358,13 @@ main{ flex: 1; width: 100%; }
 .branch-grid{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 @media (max-width: 860px){ .branch-grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px){ .branch-grid{ grid-template-columns: minmax(0, 1fr); } }
+
+/* Admin: switch between Admin view and Member view (top bar) */
+.nav .view-switch{
+  font: inherit; font-size: 11px; font-weight: 600;
+  background: none; color: #EEEBE4; cursor: pointer;
+  border: 1px solid rgba(238,235,228,0.55); border-radius: 999px; padding: 6px 12px;
+}
+.nav .view-switch:hover{ background: rgba(255,255,255,0.12); }
+.nav .view-switch.is-member{ background: var(--accent-2); color: #241B12; border-color: var(--accent-2); }
+.nav .view-switch:disabled{ opacity: 0.6; cursor: default; }

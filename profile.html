@@ -257,8 +257,8 @@ async function renderMembers() {
 }
 
 async function initAdmin(userId) {
-  const { data } = await sb.from('profiles').select('role').eq('id', userId).single();
-  if (data && data.role === 'admin') {
+  const status = await getMemberStatus();   // false in Member view
+  if (status.isAdmin) {
     const { data: branches } = await sb.from('branches').select('*').order('sort_order');
     allBranches = sortBranchesByYear((branches || []).filter((b) => !b.gallery_only));
     document.getElementById('admin-approvals').classList.remove('hidden');
