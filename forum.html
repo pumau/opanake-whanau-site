@@ -59,7 +59,7 @@
 <input id="f-search" type="text" placeholder="Search topics and posts…" style="flex: 1; min-width: 200px;">
 <select id="f-category"><option value="">All categories</option></select>
 </div>
-<div id="categories" style="display: flex; flex-direction: column; gap: 20px;">
+<div id="categories" style="display: flex; flex-direction: column; gap: 32px;">
 <div class="help-text">Loading forum…</div>
 </div>
 </div>
@@ -145,22 +145,23 @@ function renderForum() {
       if (searching && catTopics.length === 0 && !(categoryFilter && !search)) return '';
 
       const topicsHtml = catTopics.length
-        ? catTopics.map((t) => `
-            <a href="topic.html?id=${encodeURIComponent(t.id)}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border); gap: 12px;">
-              <div>
-                <div style="font-weight:600; font-size:14.5px;">${escapeHtml(t.title)}</div>
-                <div class="help-text" style="margin-top:2px;">${escapeHtml(nameById[t.author_id] || 'A whānau member')} · ${formatDate(t.created_at)}</div>
-              </div>
-              <div class="help-text" style="flex-shrink:0;">${postCounts[t.id] || 1} post${(postCounts[t.id] || 1) === 1 ? '' : 's'}</div>
-            </a>`).join('')
+        ? `<div class="topic-grid">${catTopics.map((t) => {
+            const n = postCounts[t.id] || 1;
+            return `
+            <a href="topic.html?id=${encodeURIComponent(t.id)}" class="topic-card">
+              <div class="topic-card-title">${escapeHtml(t.title)}</div>
+              <div class="help-text">${escapeHtml(nameById[t.author_id] || 'A whānau member')} · ${formatDate(t.created_at)}</div>
+              <div class="topic-card-foot">${n} post${n === 1 ? '' : 's'}</div>
+            </a>`;
+          }).join('')}</div>`
         : '<p class="help-text" style="padding: 8px 0;">No topics yet, be the first to post.</p>';
 
       return `
-        <div class="card">
+        <section>
           <h2 style="font-size: 18px; margin: 0;">${escapeHtml(c.name)}</h2>
           ${c.description ? `<p class="help-text" style="margin-top:4px;">${escapeHtml(c.description)}</p>` : ''}
           <div style="margin-top: 12px;">${topicsHtml}</div>
-        </div>`;
+        </section>`;
     }).join('');
 
   container.innerHTML = html || '<p class="help-text">No topics match that search.</p>';
