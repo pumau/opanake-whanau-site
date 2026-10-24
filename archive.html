@@ -129,11 +129,26 @@ function escapeHtml(s) {
 // (This stops casual saving. Anything a person can see on screen can still be
 // screenshotted, so only upload what members are fine to read.)
 const VIEWABLE = /\.(pdf|jpe?g|png|gif|webp|txt)$/i;
-function canView(path) { return VIEWABLE.test(path || ''); }
+function canView(path) { return !!path; }  // every document can be opened in the viewer
 const MIME = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', txt: 'text/plain' };
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
 let viewerUrl = null;
 let pdfLoading = null;
+const MAMMOTH = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js';
+const SHEETJS = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+const scriptLoads = {};
+function loadScript(url) {
+  if (!scriptLoads[url]) {
+    scriptLoads[url] = new Promise((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = url;
+      el.onload = resolve;
+      el.onerror = () => { delete scriptLoads[url]; reject(new Error('script failed to load')); };
+      document.head.appendChild(el);
+    });
+  }
+  return scriptLoads[url];
+}
 
 function loadPdfJs() {
   if (window.pdfjsLib) return Promise.resolve();
@@ -193,12 +208,37 @@ async function openViewer(path, title) {
         c.style.width = width + 'px'; c.style.aspectRatio = b.width + ' / ' + b.height;
         body.appendChild(c); io.observe(c);
       }
+    } else if (ext === 'docx') {
+      await loadScript(MAMMOTH);
+      const result = await window.mammoth.convertToHtml({ arrayBuffer: await data.arrayBuffer() });
+      body.innerHTML = '';
+      const doc = document.createElement('div');
+      doc.className = 'viewer-doc';
+      doc.innerHTML = result.value || '<p>This document appears to be empty.</p>';
+      body.appendChild(doc);
+    } else if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') {
+      await loadScript(SHEETJS);
+      const wb = window.XLSX.read(await data.arrayBuffer(), { type: 'array' });
+      body.innerHTML = '';
+      wb.SheetNames.forEach((name) => {
+        const doc = document.createElement('div');
+        doc.className = 'viewer-doc';
+        const h = document.createElement('h3');
+        h.textContent = name;
+        doc.appendChild(h);
+        const holder = document.createElement('div');
+        holder.innerHTML = window.XLSX.utils.sheet_to_html(wb.Sheets[name], { header: '', footer: '' });
+        doc.appendChild(holder);
+        body.appendChild(doc);
+      });
     } else if (ext === 'txt') {
       body.innerHTML = '';
       const pre = document.createElement('pre');
       pre.className = 'viewer-text';
       pre.textContent = await data.text();
       body.appendChild(pre);
+    } else if (!/^(jpe?g|png|gif|webp)$/.test(ext)) {
+      body.innerHTML = '<p class="viewer-msg">This type of file can\'t be shown on screen. Ask an admin to upload it again as a PDF.</p>';
     } else {
       viewerUrl = URL.createObjectURL(new Blob([data], { type: MIME[ext] || 'image/jpeg' }));
       body.innerHTML = '';
@@ -308,7 +348,6 @@ function fileCardHtml(f) {
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         ${discussLink}
         ${canView(f.storage_path) ? `<button type="button" class="btn btn-outline" data-action="view" data-path="${escapeHtml(f.storage_path)}" data-title="${escapeHtml(f.title)}">View</button>` : ''}
-        ${(isAdmin || !canView(f.storage_path)) ? `<a data-action="download" data-path="${escapeHtml(f.storage_path)}" class="btn btn-outline" href="#">Download</a>` : ''}
         ${isAdmin ? `<button type="button" class="btn btn-outline" data-action="edit" data-id="${f.id}">Edit</button>
         <button type="button" class="btn btn-outline" data-action="delete" data-id="${f.id}" style="color:#B3492A;">Delete</button>` : ''}
       </div>
@@ -364,17 +403,6 @@ document.getElementById('file-list').addEventListener('click', async (e) => {
   if (action === 'view') {
     e.preventDefault();
     openViewer(el.getAttribute('data-path'), el.getAttribute('data-title'));
-    return;
-  }
-
-  if (action === 'download') {
-    e.preventDefault();
-    const { data, error: signError } = await sb.storage.from('archive').createSignedUrl(el.getAttribute('data-path'), 300);
-    if (signError || !data) {
-      alert("Couldn't get that file right now.");
-      return;
-    }
-    window.open(data.signedUrl, '_blank');
     return;
   }
 

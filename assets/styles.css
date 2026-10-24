@@ -346,3 +346,10 @@ main{ flex: 1; width: 100%; }
 
 /* Archive: short factual summary under a document title */
 .doc-summary{ margin: 8px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); max-width: 68ch; white-space: pre-line; }
+.viewer-doc{ background: #fff; color: #222; padding: 32px 36px; max-width: 860px; width: 100%; box-sizing: border-box; font-size: 15px; line-height: 1.6; box-shadow: 0 2px 14px rgba(0,0,0,0.5); overflow-x: auto; }
+.viewer-doc h1,.viewer-doc h2,.viewer-doc h3{ font-family: 'Fraunces', serif; margin: 1.2em 0 0.4em; line-height: 1.25; }
+.viewer-doc p{ margin: 0 0 0.8em; }
+.viewer-doc img{ max-width: 100%; height: auto; }
+.viewer-doc table{ border-collapse: collapse; margin: 0.8em 0; font-size: 14px; }
+.viewer-doc td,.viewer-doc th{ border: 1px solid #ccc; padding: 4px 8px; vertical-align: top; }
+@media (max-width: 600px){ .viewer-doc{ padding: 18px 16px; } }
