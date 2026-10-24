@@ -54,6 +54,7 @@
 
 <div id="topic-content" class="container hidden" style="padding: 12px 56px 56px; max-width: 760px;">
 <h1 id="topic-title" style="font-size: 28px;">—</h1>
+<div id="topic-admin" class="hidden" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px;"></div>
 <div id="doc-link" class="card-muted hidden" style="border-radius: 12px; padding: 14px 18px; margin-top: 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
 <div>
 <div class="help-text">About this Archive document</div>
@@ -96,6 +97,9 @@ function formatDateTime(iso) {
 
 let topicId = null;
 let session = null;
+let isAdmin = false;
+let topicHidden = false;
+const MOD_NEEDS_UPDATE = "That didn't work. Has database update #15 been run?";
 
 async function loadTopic() {
   topicId = new URLSearchParams(window.location.search).get('id');
@@ -129,11 +133,23 @@ async function loadTopic() {
     return;
   }
 
-  const { data: posts } = await sb
+  let { data: posts, error: postsError } = await sb
     .from('forum_posts')
-    .select('id, author_id, body, created_at')
+    .select('id, author_id, body, created_at, hidden')
     .eq('topic_id', topicId)
     .order('created_at');
+  if (postsError) {
+    // database update #15 (hide/delete) not run yet
+    ({ data: posts } = await sb
+      .from('forum_posts')
+      .select('id, author_id, body, created_at')
+      .eq('topic_id', topicId)
+      .order('created_at'));
+  }
+  if (isAdmin) {
+    const { data: th } = await sb.from('forum_topics').select('hidden').eq('id', topicId).single();
+    topicHidden = !!(th && th.hidden);
+  }
 
   const { data: directory } = await sb.rpc('list_member_directory');
   const nameById = {};
@@ -141,13 +157,19 @@ async function loadTopic() {
 
   document.getElementById('topic-title').textContent = topic.title;
   document.getElementById('post-list').innerHTML = (posts || []).map((p) => `
-    <div class="card">
+    <div class="card"${p.hidden ? ' style="border-style: dashed; opacity: 0.65;"' : ''}>
       <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:8px;">
-        <span style="font-weight:600; font-size:13.5px;">${escapeHtml(nameById[p.author_id] || 'A whānau member')}</span>
+        <span style="font-weight:600; font-size:13.5px;">${escapeHtml(nameById[p.author_id] || 'A whānau member')}${p.hidden ? ' <span class="badge badge-pending" style="margin-left:6px;">Hidden from members</span>' : ''}</span>
         <span class="help-text">${formatDateTime(p.created_at)}</span>
       </div>
       <p style="margin:0; font-size:14.5px; line-height:1.6; white-space: pre-wrap;">${escapeHtml(p.body)}</p>
+      ${isAdmin ? `
+      <div style="display:flex; gap:8px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border);">
+        <button type="button" class="btn btn-outline" data-mod="${p.hidden ? 'unhide-post' : 'hide-post'}" data-id="${p.id}" style="padding:4px 12px; font-size:12.5px;">${p.hidden ? 'Unhide' : 'Hide'}</button>
+        <button type="button" class="btn btn-outline" data-mod="delete-post" data-id="${p.id}" style="padding:4px 12px; font-size:12.5px; color:#B3492A;">Delete</button>
+      </div>` : ''}
     </div>`).join('');
+  renderTopicAdmin();
 
   await showDocumentLink(topic);
 
@@ -204,10 +226,47 @@ document.getElementById('reply-form').addEventListener('submit', async (e) => {
   window.location.reload();
 });
 
+// ---- Admin: hide or delete ----------------------------------------------
+function renderTopicAdmin() {
+  const bar = document.getElementById('topic-admin');
+  if (!isAdmin) return;
+  bar.classList.remove('hidden');
+  bar.innerHTML = `
+    ${topicHidden ? '<span class="badge badge-pending">Topic hidden from members</span>' : ''}
+    <button type="button" class="btn btn-outline" data-mod="${topicHidden ? 'unhide-topic' : 'hide-topic'}" style="padding:4px 12px; font-size:12.5px;">${topicHidden ? 'Unhide topic' : 'Hide topic'}</button>
+    <button type="button" class="btn btn-outline" data-mod="delete-topic" style="padding:4px 12px; font-size:12.5px; color:#B3492A;">Delete topic</button>`;
+}
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest && e.target.closest('button[data-mod]');
+  if (!btn || !isAdmin) return;
+  const action = btn.getAttribute('data-mod');
+  const id = btn.getAttribute('data-id');
+  let result = null;
+
+  if (action === 'hide-post' || action === 'unhide-post') {
+    result = await sb.from('forum_posts').update({ hidden: action === 'hide-post' }).eq('id', id);
+  } else if (action === 'delete-post') {
+    if (!confirm('Delete this post for good? This cannot be undone. (Hide it instead if you might want it back.)')) return;
+    result = await sb.from('forum_posts').delete().eq('id', id);
+  } else if (action === 'hide-topic' || action === 'unhide-topic') {
+    if (action === 'hide-topic' && !confirm('Hide this whole topic from members? You can unhide it later.')) return;
+    result = await sb.from('forum_topics').update({ hidden: action === 'hide-topic' }).eq('id', topicId);
+  } else if (action === 'delete-topic') {
+    if (!confirm('Delete this whole topic and every post in it, for good? This cannot be undone. (Hide it instead if you might want it back.)')) return;
+    result = await sb.from('forum_topics').delete().eq('id', topicId);
+    if (!result.error) { window.location.href = 'forum.html'; return; }
+  }
+
+  if (result && result.error) { alert(MOD_NEEDS_UPDATE); return; }
+  window.location.reload();
+});
+
 async function init() {
   const status = await initAccessGate();
   if (!status.approved) return;
   session = status.session;
+  isAdmin = !!status.isAdmin;
   document.getElementById('loading').classList.remove('hidden');
   await loadTopic();
 }

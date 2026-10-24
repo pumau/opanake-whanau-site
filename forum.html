@@ -148,10 +148,10 @@ function renderForum() {
         ? `<div class="topic-grid">${catTopics.map((t) => {
             const n = postCounts[t.id] || 1;
             return `
-            <a href="topic.html?id=${encodeURIComponent(t.id)}" class="topic-card">
+            <a href="topic.html?id=${encodeURIComponent(t.id)}" class="topic-card"${t.hidden ? ' style="border-style: dashed; opacity: 0.65;"' : ''}>
               <div class="topic-card-title">${escapeHtml(t.title)}</div>
               <div class="help-text">${escapeHtml(nameById[t.author_id] || 'A whānau member')} · ${formatDate(t.created_at)}</div>
-              <div class="topic-card-foot">${n} post${n === 1 ? '' : 's'}</div>
+              <div class="topic-card-foot">${n} post${n === 1 ? '' : 's'}${t.hidden ? ' · <span style="color:#B3492A;">Hidden from members</span>' : ''}</div>
             </a>`;
           }).join('')}</div>`
         : '<p class="help-text" style="padding: 8px 0;">No topics yet, be the first to post.</p>';
@@ -176,14 +176,24 @@ async function loadForum() {
     .select('id, name, description, sort_order')
     .order('sort_order');
 
-  const { data: topicRows } = await sb
+  // "hidden" needs database update #15; fall back to the old columns without it.
+  let { data: topicRows, error: topicsErr } = await sb
     .from('forum_topics')
-    .select('id, category_id, title, author_id, created_at')
+    .select('id, category_id, title, author_id, created_at, hidden')
     .order('created_at', { ascending: false });
+  if (topicsErr) {
+    ({ data: topicRows } = await sb
+      .from('forum_topics')
+      .select('id, category_id, title, author_id, created_at')
+      .order('created_at', { ascending: false }));
+  }
 
-  const { data: allPosts } = await sb
+  let { data: allPosts, error: postsErr } = await sb
     .from('forum_posts')
-    .select('topic_id, body');
+    .select('topic_id, body, hidden');
+  if (postsErr) {
+    ({ data: allPosts } = await sb.from('forum_posts').select('topic_id, body'));
+  }
 
   if (catError || !cats) {
     document.getElementById('categories').innerHTML = '<p class="error-text">Could not load the forum right now.</p>';
@@ -195,6 +205,7 @@ async function loadForum() {
   postCounts = {};
   postText = {};
   (allPosts || []).forEach((p) => {
+    if (p.hidden) return; // admins can see hidden posts, but they don't count
     postCounts[p.topic_id] = (postCounts[p.topic_id] || 0) + 1;
     postText[p.topic_id] = (postText[p.topic_id] || '') + ' ' + (p.body || '').toLowerCase();
   });
