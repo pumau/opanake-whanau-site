@@ -416,6 +416,14 @@ main{ flex: 1; width: 100%; }
 }
 
 /* Footer: link to the whānau Facebook group */
-.footer-social{ display: flex; align-items: center; gap: 10px; width: fit-content; margin-top: 14px; padding: 8px 16px 8px 12px; border: 1px solid rgba(227,239,221,0.45); border-radius: 999px; color: #E3EFDD; font-weight: 600; font-size: 13px; }
+.footer-social{ display: flex; align-items: center; gap: 10px; width: fit-content; margin: 0; padding: 8px 16px 8px 12px; border: 1px solid rgba(227,239,221,0.45); border-radius: 999px; color: #E3EFDD; font-weight: 600; font-size: 13px; }
 .footer-social:hover{ background: rgba(255,255,255,0.12); }
 .footer-social svg{ flex: 0 0 auto; }
+
+/* Footer layout: copyright on the left, Facebook button on the right, room underneath */
+.footer{ display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 20px; padding-bottom: 64px; }
+.footer-map{ flex: 0 0 100%; }
+@media (max-width: 700px){
+  .footer{ padding-bottom: 48px; }
+  .footer-social{ margin-left: auto; }
+}
