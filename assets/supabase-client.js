@@ -113,7 +113,7 @@ function sortBranchesByYear(list) {
 // to post. If the update has not been run yet, or the check can't be reached,
 // it lets the post through (the database still enforces the rule once live).
 const FORUM_REWORD_MESSAGE =
-  "A few of the words in that don't fit our kōrero guidelines. Please reword it and try again. Ideas and connection are always welcome here.";
+  "A few of the words in that don't fit our kōrerorero guidelines. Please reword it and try again. Ideas and connection are always welcome here.";
 
 async function forumTextOk(text) {
   try {
