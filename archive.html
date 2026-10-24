@@ -49,7 +49,7 @@
 
 <div class="col-main">
 <div class="filter-bar">
-<input id="f-search" type="text" placeholder="Search titles…">
+<input id="f-search" type="text" placeholder="Search titles and summaries…">
 <select id="f-category"><option value="">All categories</option></select>
 <label class="help-text" style="display:flex; align-items:center; gap:6px;">Dated from <input id="f-from" type="date"></label>
 <label class="help-text" style="display:flex; align-items:center; gap:6px;">To <input id="f-to" type="date"></label>
@@ -80,6 +80,11 @@
 <label for="up-date">Document date</label>
 <input id="up-date" type="date" required>
 <span class="help-text">The date on the document itself, such as the meeting or court date.</span>
+</div>
+<div class="field">
+<label for="up-summary">Summary <span class="help-text" style="font-weight:400;">(optional)</span></label>
+<textarea id="up-summary" rows="4" maxlength="1500" placeholder="e.g. Order of the Māori Land Court vesting the land in…"></textarea>
+<span class="help-text">A few sentences on what the document is and what it records. Stick to what is written in it, and leave out opinions or guesses.</span>
 </div>
 <div class="field">
 <label for="up-file">File</label>
@@ -223,6 +228,7 @@ let topicByDocId = {};   // archive document id -> forum topic id, once a discus
 let scrolledToDoc = false;
 let highlightId = new URLSearchParams(window.location.search).get('doc');
 let docDatesSupported = true; // false until database update #9 has been run
+let summarySupported = true;  // false until database update #16 has been run
 
 function pad2(n) { return String(n).padStart(2, '0'); }
 function todayStr() {
@@ -279,6 +285,7 @@ function fileCardHtml(f) {
         <div class="field"><label>Category</label><select data-edit="category">${options}</select></div>
         <div class="field hidden" data-edit-newcat-field><label>New category name</label><input type="text" data-edit="newcategory"></div>
         ${docDatesSupported ? `<div class="field"><label>Document date</label><input type="date" data-edit="date" value="${docDate(f)}"></div>` : '<p class="help-text" style="margin-bottom:12px;">Editing dates needs database update #9 to be run first.</p>'}
+        ${summarySupported ? `<div class="field"><label>Summary</label><textarea data-edit="summary" rows="5" maxlength="1500">${escapeHtml(f.summary || '')}</textarea><span class="help-text">What the document is and what it records. Facts only.</span></div>` : ''}
         <div class="field"><label>Replace the file (optional)</label><input type="file" data-edit="file"><span class="help-text">Leave empty to keep the current file.</span></div>
         <div class="error-text hidden" data-edit-error></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -293,9 +300,10 @@ function fileCardHtml(f) {
   const highlighted = highlightId === f.id;
   return `
     <div class="card" id="doc-${f.id}" style="display:flex; justify-content:space-between; align-items:center; gap: 16px; flex-wrap: wrap; padding: 18px 22px; ${highlighted ? 'border: 2px solid var(--accent); background: var(--river-soft);' : ''}">
-      <div>
+      <div style="flex: 1 1 320px; min-width: 0;">
         <div style="font-weight:600; font-size:14.5px;">${escapeHtml(f.title)}</div>
         <div class="help-text" style="margin-top:2px;">${escapeHtml(categoryLabel(f.category))} · dated ${formatDocDate(docDate(f))}</div>
+        ${f.summary ? `<p class="doc-summary">${escapeHtml(f.summary)}</p>` : ''}
       </div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         ${discussLink}
@@ -316,7 +324,7 @@ function renderFiles() {
 
   const files = allFiles.filter((f) => {
     if (category && f.category !== category) return false;
-    if (search && !(f.title || '').toLowerCase().includes(search)) return false;
+    if (search && !((f.title || '') + ' ' + (f.summary || '')).toLowerCase().includes(search)) return false;
     const day = docDate(f);
     if (from && day < from) return false;
     if (to && day > to) return false;
@@ -429,6 +437,9 @@ document.getElementById('file-list').addEventListener('click', async (e) => {
       changes.storage_path = newPath;
     }
 
+    const summaryInput = get('summary');
+    if (summaryInput) changes.summary = summaryInput.value.trim() || null;
+
     const { error } = await sb.from('archive_files').update(changes).eq('id', id);
     if (error) {
       errorEl.textContent = error.message;
@@ -448,8 +459,16 @@ document.getElementById('file-list').addEventListener('click', async (e) => {
 async function loadFiles() {
   let { data: files, error } = await sb
     .from('archive_files')
-    .select('id, title, category, storage_path, uploaded_at, document_date')
+    .select('id, title, category, storage_path, uploaded_at, document_date, summary')
     .order('uploaded_at', { ascending: false });
+  summarySupported = !error;
+  if (error) {
+    // Summaries need database update #16; try again without that column.
+    ({ data: files, error } = await sb
+      .from('archive_files')
+      .select('id, title, category, storage_path, uploaded_at, document_date')
+      .order('uploaded_at', { ascending: false }));
+  }
   if (error) {
     docDatesSupported = false;
     ({ data: files, error } = await sb
@@ -523,6 +542,7 @@ document.getElementById('up-submit').addEventListener('click', async () => {
   let category = document.getElementById('up-category').value;
   if (category === NEW_CATEGORY) category = document.getElementById('up-new-category').value.trim();
   const documentDate = document.getElementById('up-date').value;
+  const summary = document.getElementById('up-summary').value.trim();
   const fileInput = document.getElementById('up-file');
   const file = fileInput.files[0];
 
@@ -534,6 +554,12 @@ document.getElementById('up-submit').addEventListener('click', async () => {
 
   if (!docDatesSupported) {
     errorEl.textContent = 'Document dates need database update #9 to be run in Supabase first.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  if (summary && !summarySupported) {
+    errorEl.textContent = 'Summaries need database update #16 to be run in Supabase first.';
     errorEl.classList.remove('hidden');
     return;
   }
@@ -552,13 +578,15 @@ document.getElementById('up-submit').addEventListener('click', async () => {
     return;
   }
 
-  const { error: insertError } = await sb.from('archive_files').insert({
+  const newRow = {
     title,
     category,
     document_date: documentDate,
     storage_path: storagePath,
     uploaded_by: session.user.id
-  });
+  };
+  if (summary) newRow.summary = summary;
+  const { error: insertError } = await sb.from('archive_files').insert(newRow);
 
   btn.disabled = false;
   btn.textContent = 'Upload';
@@ -573,6 +601,7 @@ document.getElementById('up-submit').addEventListener('click', async () => {
 
   document.getElementById('up-title').value = '';
   document.getElementById('up-date').value = todayStr();
+  document.getElementById('up-summary').value = '';
   document.getElementById('up-new-category').value = '';
   document.getElementById('up-new-category-field').classList.add('hidden');
   fileInput.value = '';

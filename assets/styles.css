@@ -343,3 +343,6 @@ main{ flex: 1; width: 100%; }
 .link-card:hover{ transform: translateY(-2px); box-shadow: 0 8px 20px rgba(42,36,32,0.12); }
 .link-card-title{ display: flex; justify-content: space-between; gap: 10px; font-weight: 600; font-size: 15px; line-height: 1.35; color: var(--ink); }
 .link-card-arrow{ color: var(--accent-dark); font-weight: 700; flex-shrink: 0; }
+
+/* Archive: short factual summary under a document title */
+.doc-summary{ margin: 8px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); max-width: 68ch; white-space: pre-line; }
