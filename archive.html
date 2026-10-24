@@ -516,11 +516,20 @@ async function loadFiles() {
   // Which documents already have a forum discussion (needs update #11; if
   // that hasn't been run the column doesn't exist and we just skip this).
   topicByDocId = {};
-  const { data: linkedTopics, error: topicsError } = await sb
+  // Branch-only topics (update #17) are left out so the link goes to the open one.
+  let { data: linkedTopics, error: topicsError } = await sb
     .from('forum_topics')
     .select('id, archive_file_id, created_at')
     .not('archive_file_id', 'is', null)
+    .is('branch_id', null)
     .order('created_at', { ascending: false });
+  if (topicsError) {
+    ({ data: linkedTopics, error: topicsError } = await sb
+      .from('forum_topics')
+      .select('id, archive_file_id, created_at')
+      .not('archive_file_id', 'is', null)
+      .order('created_at', { ascending: false }));
+  }
   if (!topicsError) (linkedTopics || []).forEach((t) => { topicByDocId[t.archive_file_id] = t.id; });
 
   refreshCategoryControls();

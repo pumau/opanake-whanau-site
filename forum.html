@@ -72,6 +72,11 @@
 <label for="nt-category">Category</label>
 <select id="nt-category" required></select>
 </div>
+<div class="field hidden" id="nt-branch-field">
+<label for="nt-branch">Who can see it?</label>
+<select id="nt-branch"></select>
+<p class="help-text" id="nt-branch-help" style="margin: 6px 0 0;"></p>
+</div>
 <div class="field">
 <label for="nt-title">Title</label>
 <input id="nt-title" type="text" required>
@@ -127,6 +132,20 @@ let categories = [];
 let topics = [];
 let postCounts = {};
 let postText = {};
+let myBranchId = null;      // this person's branch, if they have one
+let myBranchName = '';
+let branchTopicsOn = false; // true once database update #17 has been run
+
+function topicCardHtml(t, showCategory) {
+  const n = postCounts[t.id] || 1;
+  const cat = showCategory ? categories.find((c) => c.id === t.category_id) : null;
+  return `
+            <a href="topic.html?id=${encodeURIComponent(t.id)}" class="topic-card"${t.hidden ? ' style="border-style: dashed; opacity: 0.65;"' : ''}>
+              <div class="topic-card-title">${escapeHtml(t.title)}</div>
+              <div class="help-text">${escapeHtml(nameById[t.author_id] || 'A whānau member')} · ${formatDate(t.created_at)}</div>
+              <div class="topic-card-foot">${n} post${n === 1 ? '' : 's'}${cat ? ' · ' + escapeHtml(cat.name) : ''}${t.hidden ? ' · <span style="color:#B3492A;">Hidden from members</span>' : ''}</div>
+            </a>`;
+}
 
 function renderForum() {
   const container = document.getElementById('categories');
@@ -134,10 +153,35 @@ function renderForum() {
   const categoryFilter = document.getElementById('f-category').value;
   const searching = !!search || !!categoryFilter;
 
+  const matches = (t) => {
+    if (categoryFilter && t.category_id !== categoryFilter) return false;
+    if (!search) return true;
+    return (t.title || '').toLowerCase().includes(search) || (postText[t.id] || '').includes(search);
+  };
+
+  // Branch-only topics sit in their own section at the top. Only people in
+  // that branch are ever sent these by the database.
+  let branchHtml = '';
+  if (branchTopicsOn && myBranchId) {
+    const branchTopics = topics.filter((t) => t.branch_id && t.branch_id === myBranchId && matches(t));
+    if (!(searching && branchTopics.length === 0)) {
+      const inner = branchTopics.length
+        ? `<div class="topic-grid">${branchTopics.map((t) => topicCardHtml(t, true)).join('')}</div>`
+        : '<p class="help-text" style="padding: 8px 0;">No branch-only topics yet. Start one and only people in your branch will see it.</p>';
+      branchHtml = `
+        <section class="card-muted" style="border-radius: 14px; padding: 18px 20px;">
+          <h2 style="font-size: 18px; margin: 0;">Just for ${escapeHtml(myBranchName || 'your')} branch</h2>
+          <p class="help-text" style="margin-top:4px;">Only people in your branch can see these topics. Nobody else can, including admins from other branches.</p>
+          <div style="margin-top: 12px;">${inner}</div>
+        </section>`;
+    }
+  }
+
   const html = categories
     .filter((c) => !categoryFilter || c.id === categoryFilter)
     .map((c) => {
       const catTopics = topics.filter((t) => {
+        if (t.branch_id) return false;
         if (t.category_id !== c.id) return false;
         if (!search) return true;
         return (t.title || '').toLowerCase().includes(search) || (postText[t.id] || '').includes(search);
@@ -146,15 +190,7 @@ function renderForum() {
       if (searching && catTopics.length === 0 && !(categoryFilter && !search)) return '';
 
       const topicsHtml = catTopics.length
-        ? `<div class="topic-grid">${catTopics.map((t) => {
-            const n = postCounts[t.id] || 1;
-            return `
-            <a href="topic.html?id=${encodeURIComponent(t.id)}" class="topic-card"${t.hidden ? ' style="border-style: dashed; opacity: 0.65;"' : ''}>
-              <div class="topic-card-title">${escapeHtml(t.title)}</div>
-              <div class="help-text">${escapeHtml(nameById[t.author_id] || 'A whānau member')} · ${formatDate(t.created_at)}</div>
-              <div class="topic-card-foot">${n} post${n === 1 ? '' : 's'}${t.hidden ? ' · <span style="color:#B3492A;">Hidden from members</span>' : ''}</div>
-            </a>`;
-          }).join('')}</div>`
+        ? `<div class="topic-grid">${catTopics.map((t) => topicCardHtml(t, false)).join('')}</div>`
         : '<p class="help-text" style="padding: 8px 0;">No topics yet, be the first to post.</p>';
 
       return `
@@ -165,7 +201,7 @@ function renderForum() {
         </section>`;
     }).join('');
 
-  container.innerHTML = html || '<p class="help-text">No topics match that search.</p>';
+  container.innerHTML = (branchHtml + html) || '<p class="help-text">No topics match that search.</p>';
 }
 
 async function loadForum() {
@@ -177,11 +213,19 @@ async function loadForum() {
     .select('id, name, description, sort_order')
     .order('sort_order');
 
-  // "hidden" needs database update #15; fall back to the old columns without it.
+  // "branch_id" needs database update #17 and "hidden" needs #15; fall back
+  // to the older columns when they haven't been run yet.
   let { data: topicRows, error: topicsErr } = await sb
     .from('forum_topics')
-    .select('id, category_id, title, author_id, created_at, hidden')
+    .select('id, category_id, title, author_id, created_at, hidden, branch_id')
     .order('created_at', { ascending: false });
+  branchTopicsOn = !topicsErr;
+  if (topicsErr) {
+    ({ data: topicRows, error: topicsErr } = await sb
+      .from('forum_topics')
+      .select('id, category_id, title, author_id, created_at, hidden')
+      .order('created_at', { ascending: false }));
+  }
   if (topicsErr) {
     ({ data: topicRows } = await sb
       .from('forum_topics')
@@ -215,8 +259,26 @@ async function loadForum() {
   document.getElementById('nt-category').innerHTML = options;
   document.getElementById('f-category').innerHTML = '<option value="">All categories</option>' + options;
 
+  await setupBranchChoice();
   renderForum();
   prefillFromLink();
+}
+
+// Lets someone start a topic that only their own branch can see. Needs
+// database update #17 and a branch on the person's profile.
+async function setupBranchChoice() {
+  const field = document.getElementById('nt-branch-field');
+  field.classList.add('hidden');
+  if (!branchTopicsOn || !myBranchId) return;
+  const { data: b } = await sb.from('branches').select('name').eq('id', myBranchId).single();
+  myBranchName = (b && b.name) || '';
+  const label = myBranchName ? myBranchName + ' branch' : 'my branch';
+  document.getElementById('nt-branch').innerHTML =
+    '<option value="">Everyone in the whānau</option>' +
+    `<option value="${escapeHtml(myBranchId)}">Only the ${escapeHtml(label)}</option>`;
+  document.getElementById('nt-branch-help').textContent =
+    'Pick "Only the ' + label + '" and nobody outside your branch can see the topic or its replies. This can\'t be changed afterwards.';
+  field.classList.remove('hidden');
 }
 
 // Links from elsewhere on the site (e.g. "Discuss in forum" on an Archive
@@ -263,6 +325,10 @@ document.getElementById('new-topic-form').addEventListener('submit', async (e) =
   }
 
   const newTopic = { category_id: categoryId, author_id: session.user.id, title };
+  const branchChoice = document.getElementById('nt-branch').value;
+  if (branchChoice && !document.getElementById('nt-branch-field').classList.contains('hidden')) {
+    newTopic.branch_id = branchChoice;
+  }
   if (linkedDocId) newTopic.archive_file_id = linkedDocId;
 
   let { data: topic, error: topicError } = await sb
@@ -351,6 +417,7 @@ async function init() {
   const status = await initAccessGate();
   if (!status.approved) return;
   session = status.session;
+  myBranchId = (status.profile && status.profile.branch_id) || null;
   document.getElementById('page-content').classList.remove('hidden');
   document.getElementById('f-search').addEventListener('input', renderForum);
   document.getElementById('f-category').addEventListener('change', renderForum);
