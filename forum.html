@@ -85,6 +85,11 @@
 <label for="nt-body">First post</label>
 <textarea id="nt-body" required rows="5" style="font: inherit; font-size: 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); resize: vertical;"></textarea>
 </div>
+<div class="field hidden" id="nt-file-field">
+<label for="nt-file">Attach a document (optional)</label>
+<input id="nt-file" type="file">
+<p class="help-text" style="margin: 6px 0 0;">PDF, Word, Excel or a picture, up to 15 MB. Everyone who can see the topic can read it on screen, but can't download it.</p>
+</div>
 <p class="help-text" style="margin: 0 0 12px;">Ideas and connection are welcome. Swearing and hate speech are not, and are filtered out. <a href="#guidelines" onclick="document.getElementById('guidelines').open = true;" style="text-decoration: underline;">Read the guidelines</a>.</p>
 <div id="nt-error" class="error-text hidden"></div>
 <button type="submit" id="nt-submit" class="btn">Post topic</button>
@@ -135,6 +140,7 @@ let postText = {};
 let myBranchId = null;      // this person's branch, if they have one
 let myBranchName = '';
 let branchTopicsOn = false; // true once database update #17 has been run
+let filesOn = false;        // true once database update #18 has been run
 
 function topicCardHtml(t, showCategory) {
   const n = postCounts[t.id] || 1;
@@ -260,6 +266,11 @@ async function loadForum() {
   document.getElementById('f-category').innerHTML = '<option value="">All categories</option>' + options;
 
   await setupBranchChoice();
+  filesOn = await forumFilesReady();
+  if (filesOn) {
+    document.getElementById('nt-file').setAttribute('accept', FORUM_FILE_ACCEPT);
+    document.getElementById('nt-file-field').classList.remove('hidden');
+  }
   renderForum();
   prefillFromLink();
 }
@@ -324,6 +335,29 @@ document.getElementById('new-topic-form').addEventListener('submit', async (e) =
     return;
   }
 
+  // Optional document: check it, then upload it before the topic is made.
+  const file = filesOn ? document.getElementById('nt-file').files[0] : null;
+  const fileProblem = forumFileProblem(file);
+  if (fileProblem) {
+    errorEl.textContent = fileProblem;
+    errorEl.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Post topic';
+    return;
+  }
+  let uploaded = null;
+  if (file) {
+    btn.textContent = 'Uploading…';
+    uploaded = await forumUploadFile(file, session.user.id);
+    if (uploaded.error) {
+      errorEl.textContent = uploaded.error;
+      errorEl.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Post topic';
+      return;
+    }
+  }
+
   const newTopic = { category_id: categoryId, author_id: session.user.id, title };
   const branchChoice = document.getElementById('nt-branch').value;
   if (branchChoice && !document.getElementById('nt-branch-field').classList.contains('hidden')) {
@@ -349,6 +383,7 @@ document.getElementById('new-topic-form').addEventListener('submit', async (e) =
   }
 
   if (topicError || !topic) {
+    if (uploaded) await forumDiscardFile(uploaded.path);
     errorEl.textContent = forumErrorText(topicError, "Couldn't post that topic. Please try again.");
     errorEl.classList.remove('hidden');
     btn.disabled = false;
@@ -356,11 +391,12 @@ document.getElementById('new-topic-form').addEventListener('submit', async (e) =
     return;
   }
 
-  const { error: postError } = await sb
-    .from('forum_posts')
-    .insert({ topic_id: topic.id, author_id: session.user.id, body });
+  const firstPost = { topic_id: topic.id, author_id: session.user.id, body };
+  if (uploaded) { firstPost.attachment_path = uploaded.path; firstPost.attachment_name = uploaded.name; }
+  const { error: postError } = await sb.from('forum_posts').insert(firstPost);
 
   if (postError) {
+    if (uploaded) await forumDiscardFile(uploaded.path);
     errorEl.textContent = forumErrorText(postError, "Couldn't post that. Please try again.");
     errorEl.classList.remove('hidden');
     btn.disabled = false;

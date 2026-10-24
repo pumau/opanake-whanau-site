@@ -72,6 +72,11 @@
 <textarea id="reply-body" required rows="4" style="font: inherit; font-size: 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); resize: vertical;"></textarea>
 </div>
 <p class="help-text" style="margin: 0 0 12px;">Ideas and connection are welcome. Swearing and hate speech are not, and are filtered out. See the <a href="forum.html" style="text-decoration: underline;">forum guidelines</a>.</p>
+<div class="field hidden" id="reply-file-field">
+<label for="reply-file">Attach a document (optional)</label>
+<input id="reply-file" type="file">
+<p class="help-text" style="margin: 6px 0 0;">PDF, Word, Excel or a picture, up to 15 MB. Everyone who can see this topic can read it on screen, but can't download it.</p>
+</div>
 <div id="reply-error" class="error-text hidden"></div>
 <button type="submit" id="reply-submit" class="btn">Post reply</button>
 </form>
@@ -85,6 +90,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supabase-client.js"></script>
+<script src="assets/doc-viewer.js"></script>
 <script>
 function escapeHtml(s) {
   const div = document.createElement('div');
@@ -101,6 +107,8 @@ let topicId = null;
 let session = null;
 let isAdmin = false;
 let topicHidden = false;
+let filesOn = false;      // true once database update #18 has been run
+let currentPosts = [];
 const MOD_NEEDS_UPDATE = "That didn't work. Has database update #15 been run?";
 
 async function loadTopic() {
@@ -138,18 +146,27 @@ async function loadTopic() {
     return;
   }
 
-  let { data: posts, error: postsError } = await sb
-    .from('forum_posts')
-    .select('id, author_id, body, created_at, hidden')
-    .eq('topic_id', topicId)
-    .order('created_at');
-  if (postsError) {
-    // database update #15 (hide/delete) not run yet
-    ({ data: posts } = await sb
+  // attachment columns need database update #18 and hidden needs #15; try the
+  // fullest query first and fall back to older columns if they are missing.
+  let posts = null;
+  let postsError = true;
+  for (const cols of [
+    'id, author_id, body, created_at, hidden, attachment_path, attachment_name',
+    'id, author_id, body, created_at, hidden',
+    'id, author_id, body, created_at'
+  ]) {
+    ({ data: posts, error: postsError } = await sb
       .from('forum_posts')
-      .select('id, author_id, body, created_at')
+      .select(cols)
       .eq('topic_id', topicId)
       .order('created_at'));
+    if (!postsError) break;
+  }
+  currentPosts = posts || [];
+  filesOn = await forumFilesReady();
+  if (filesOn) {
+    document.getElementById('reply-file').setAttribute('accept', FORUM_FILE_ACCEPT);
+    document.getElementById('reply-file-field').classList.remove('hidden');
   }
   if (isAdmin) {
     const { data: th } = await sb.from('forum_topics').select('hidden').eq('id', topicId).single();
@@ -169,6 +186,11 @@ async function loadTopic() {
         <span class="help-text">${formatDateTime(p.created_at)}</span>
       </div>
       <p style="margin:0; font-size:14.5px; line-height:1.6; white-space: pre-wrap;">${escapeHtml(p.body)}</p>
+      ${p.attachment_path ? `
+      <div class="card-muted" style="border-radius: 10px; padding: 10px 14px; margin-top: 12px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+        <span style="font-size:13.5px; font-weight:600; word-break:break-word; min-width:0;">${escapeHtml(p.attachment_name || 'Document')}</span>
+        <button type="button" class="btn btn-outline" data-view-file="${escapeHtml(p.attachment_path)}" data-view-name="${escapeHtml(p.attachment_name || 'Document')}" style="padding:4px 12px; font-size:12.5px;">View</button>
+      </div>` : ''}
       ${isAdmin ? `
       <div style="display:flex; gap:8px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border);">
         <button type="button" class="btn btn-outline" data-mod="${p.hidden ? 'unhide-post' : 'hide-post'}" data-id="${p.id}" style="padding:4px 12px; font-size:12.5px;">${p.hidden ? 'Unhide' : 'Hide'}</button>
@@ -222,6 +244,16 @@ document.getElementById('reply-form').addEventListener('submit', async (e) => {
 
   const body = document.getElementById('reply-body').value.trim();
 
+  const file = filesOn ? document.getElementById('reply-file').files[0] : null;
+  const fileProblem = forumFileProblem(file);
+  if (fileProblem) {
+    errorEl.textContent = fileProblem;
+    errorEl.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Post reply';
+    return;
+  }
+
   if (!(await forumTextOk(body))) {
     errorEl.textContent = FORUM_REWORD_MESSAGE;
     errorEl.classList.remove('hidden');
@@ -230,12 +262,28 @@ document.getElementById('reply-form').addEventListener('submit', async (e) => {
     return;
   }
 
-  const { error } = await sb.from('forum_posts').insert({ topic_id: topicId, author_id: session.user.id, body });
+  const reply = { topic_id: topicId, author_id: session.user.id, body };
+  let uploaded = null;
+  if (file) {
+    btn.textContent = 'Uploading…';
+    uploaded = await forumUploadFile(file, session.user.id);
+    if (uploaded.error) {
+      errorEl.textContent = uploaded.error;
+      errorEl.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Post reply';
+      return;
+    }
+    reply.attachment_path = uploaded.path;
+    reply.attachment_name = uploaded.name;
+  }
+  const { error } = await sb.from('forum_posts').insert(reply);
 
   btn.disabled = false;
   btn.textContent = 'Post reply';
 
   if (error) {
+    if (uploaded) await forumDiscardFile(uploaded.path);
     errorEl.textContent = forumErrorText(error, "Couldn't post that. Please try again.");
     errorEl.classList.remove('hidden');
     return;
@@ -255,6 +303,19 @@ function renderTopicAdmin() {
     <button type="button" class="btn btn-outline" data-mod="delete-topic" style="padding:4px 12px; font-size:12.5px; color:#B3492A;">Delete topic</button>`;
 }
 
+// Open an attached document in the on-screen viewer (no download).
+document.addEventListener('click', (e) => {
+  const v = e.target.closest && e.target.closest('button[data-view-file]');
+  if (!v) return;
+  openDocViewer('forum-files', v.getAttribute('data-view-file'), v.getAttribute('data-view-name'));
+});
+
+async function removeFiles(paths) {
+  const list = (paths || []).filter(Boolean);
+  if (!list.length) return;
+  try { await sb.storage.from('forum-files').remove(list); } catch (err) { /* ignore */ }
+}
+
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest && e.target.closest('button[data-mod]');
   if (!btn || !isAdmin) return;
@@ -266,12 +327,16 @@ document.addEventListener('click', async (e) => {
     result = await sb.from('forum_posts').update({ hidden: action === 'hide-post' }).eq('id', id);
   } else if (action === 'delete-post') {
     if (!confirm('Delete this post for good? This cannot be undone. (Hide it instead if you might want it back.)')) return;
+    // The file is removed first: once the post is gone nothing links an admin to it.
+    const gone = currentPosts.find((p) => p.id === id);
+    if (gone) await removeFiles([gone.attachment_path]);
     result = await sb.from('forum_posts').delete().eq('id', id);
   } else if (action === 'hide-topic' || action === 'unhide-topic') {
     if (action === 'hide-topic' && !confirm('Hide this whole topic from members? You can unhide it later.')) return;
     result = await sb.from('forum_topics').update({ hidden: action === 'hide-topic' }).eq('id', topicId);
   } else if (action === 'delete-topic') {
     if (!confirm('Delete this whole topic and every post in it, for good? This cannot be undone. (Hide it instead if you might want it back.)')) return;
+    await removeFiles(currentPosts.map((p) => p.attachment_path));
     result = await sb.from('forum_topics').delete().eq('id', topicId);
     if (!result.error) { window.location.href = 'forum.html'; return; }
   }

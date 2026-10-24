@@ -133,6 +133,46 @@ function forumErrorText(error, fallback) {
   return msg || fallback;
 }
 
+// ---- Forum documents (database update #18) ----------------------------------
+// One document per post: PDF, Word, Excel or a picture, up to 15 MB. Members
+// open it on screen (no download button). Files sit in the private
+// "forum-files" bucket under the poster's own id.
+const FORUM_FILE_MAX = 15 * 1024 * 1024;
+const FORUM_FILE_TYPES = /\.(pdf|jpe?g|png|gif|webp|docx|xlsx|xls|csv)$/i;
+const FORUM_FILE_ACCEPT = '.pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.gif,.webp';
+
+// Returns a friendly message if the file can't be used, otherwise ''.
+function forumFileProblem(file) {
+  if (!file) return '';
+  if (!FORUM_FILE_TYPES.test(file.name)) return 'That type of file can\'t be attached. Please use a PDF, Word, Excel or picture file.';
+  if (file.size > FORUM_FILE_MAX) return 'That file is over 15 MB. Please attach a smaller one.';
+  return '';
+}
+
+// Is the database ready for attachments (update #18 run)?
+async function forumFilesReady() {
+  try {
+    const { error } = await sb.from('forum_posts').select('attachment_path').limit(1);
+    return !error;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Uploads the file and returns { path, name } or { error }.
+async function forumUploadFile(file, userId) {
+  const path = `${userId}/${Date.now()}-${safeFileName(file.name)}`;
+  const { error } = await sb.storage.from('forum-files').upload(path, file);
+  if (error) return { error: "Couldn't upload that file. Please try again." };
+  return { path, name: file.name.slice(0, 200) };
+}
+
+// Removes an uploaded file that never made it onto a post. Best effort.
+async function forumDiscardFile(path) {
+  if (!path) return;
+  try { await sb.storage.from('forum-files').remove([path]); } catch (e) { /* ignore */ }
+}
+
 // ---- How to pay (bank transfer) ---------------------------------------------
 // Shown to signed-in, approved members only, next to their tickets or order.
 const PAY_ACCOUNT_NAME = 'Embracing the Whenua';
