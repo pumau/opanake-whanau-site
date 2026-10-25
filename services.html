@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Whānau services | Ōpanake 1C South 6B</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="header">
+<a href="index.html" class="logo">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V6"/><path d="M12 6c0-3 2.5-4.5 5-4.5-0.5 3-2.5 5-5 5"/><path d="M12 10c0-3 2.8-4.7 5.6-4.7-0.6 3.1-2.8 5.2-5.6 5.2"/><path d="M12 6c0-3-2.5-4.5-5-4.5 0.5 3 2.5 5 5 5"/><path d="M12 10c0-3-2.8-4.7-5.6-4.7 0.6 3.1 2.8 5.2 5.6 5.2"/></svg>
+Ōpanake 1C South 6B
+</a>
+<nav class="nav">
+<a href="index.html">Home</a>
+<a href="whakapapa.html">Whakapapa</a>
+<a href="events.html">Hui</a>
+<a href="forum.html">Forum</a>
+<a href="archive.html">Archive</a>
+<a href="resources.html">MLC</a>
+<a href="photos.html">Photos</a>
+<a href="raffles.html">Raffles</a>
+<a href="services.html" class="active">Services</a>
+<a href="register.html" class="pill" data-nav="login-pill">Register / Login</a>
+<a href="profile.html" class="avatar" data-nav="profile-icon">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+</a>
+</nav>
+</header>
+
+<main>
+<div class="hero" style="padding-bottom: 8px;">
+<div class="eyebrow">Whānau helping whānau</div>
+<h1 style="font-size: 32px; margin-top: 8px;">Whānau services</h1>
+<p>Do you run a business, or have a skill you can lend a hand with, like gardening, building, catering or tutoring? Add it here so whānau know who to ask. Look through the list when you need something done.</p>
+</div>
+
+<div id="access-gate" class="container hidden" style="padding-top: 12px; padding-bottom: 56px;">
+<div class="card" style="max-width: 520px; margin: 0 auto; text-align:center;">
+<h2 id="access-gate-title" style="font-size:19px;">—</h2>
+<p id="access-gate-text" style="margin-top:10px;"></p>
+<a id="access-gate-btn" href="register.html" class="btn" style="margin-top:14px; display:inline-flex;">Register / log in</a>
+</div>
+</div>
+
+<div id="page-content" class="hidden container" style="padding-top: 12px; padding-bottom: 56px;">
+
+<div class="svc-tools">
+<input id="svc-search" type="search" placeholder="Search, e.g. lawns, catering, plumber" aria-label="Search the services">
+<button type="button" id="svc-add" class="btn">Add my listing</button>
+</div>
+<div class="svc-chips" id="svc-chips" role="group" aria-label="Filter by type of service"></div>
+
+<form id="svc-form" class="card svc-form hidden" novalidate>
+<h2 id="svc-form-title">Add my listing</h2>
+<div class="svc-privacy">
+<strong>Before you add this.</strong> Everything you type here is shown to all approved members of our whānau site, and nobody else. Only add contact details you are happy to share. We suggest not adding your home address.
+</div>
+<div class="field">
+<label for="svc-title">Business name, or what you do</label>
+<input id="svc-title" type="text" maxlength="100" required placeholder="e.g. Hemi's Lawns, or Gardening and hedges">
+</div>
+<div class="field">
+<label for="svc-category">Type of service</label>
+<select id="svc-category"></select>
+</div>
+<div class="field">
+<label for="svc-desc">What can you help with?</label>
+<textarea id="svc-desc" rows="4" maxlength="800" required placeholder="e.g. Lawns, hedges, rubbish runs and general garden tidy-ups. Happy to help whānau first."></textarea>
+<span class="help-text"><span id="svc-desc-count">0</span> of 800 characters</span>
+</div>
+<div class="field">
+<label for="svc-area">Where do you work? (optional)</label>
+<input id="svc-area" type="text" maxlength="100" placeholder="e.g. Dargaville and Kaipara">
+</div>
+<div class="svc-form-row">
+<div class="field">
+<label for="svc-phone">Phone (optional)</label>
+<input id="svc-phone" type="tel" maxlength="40" autocomplete="off">
+</div>
+<div class="field">
+<label for="svc-email">Email (optional)</label>
+<input id="svc-email" type="email" maxlength="200" autocomplete="off">
+</div>
+</div>
+<div class="field">
+<label for="svc-website">Website or Facebook page (optional)</label>
+<input id="svc-website" type="text" maxlength="300" autocomplete="off" placeholder="e.g. facebook.com/yourpage">
+<span class="help-text">If you add no contact details, whānau can still find you by name and ask in the Forum.</span>
+</div>
+<div id="svc-error" class="error-text hidden" role="alert"></div>
+<div class="svc-form-actions">
+<button type="submit" class="btn" id="svc-save">Save listing</button>
+<button type="button" class="btn btn-outline" id="svc-cancel">Cancel</button>
+</div>
+</form>
+
+<div class="help-text svc-count" id="svc-count" aria-live="polite"></div>
+<div class="svc-grid" id="svc-grid"></div>
+
+<div class="card card-muted" style="font-size: 13.5px; margin-top: 32px;">
+<p style="margin: 0;">Listings are added by whānau themselves. The whānau site doesn't check, recommend or take responsibility for any business or service, and it doesn't handle payments. Please agree prices and the work directly, and check qualifications and insurance where they matter. If something here shouldn't be, an admin can hide it.</p>
+</div>
+
+</div>
+</main>
+
+<footer class="footer">
+<img class="footer-map" src="assets/footer-map.jpg" alt="Aerial map of the Ōpanake 1C South blocks near Mamaranui, Kaihu" loading="lazy">
+© Ōpanake 1C South 6B whānau
+<a class="footer-social" href="https://www.facebook.com/groups/308139352992651" target="_blank" rel="noopener noreferrer" aria-label="Join our whānau Facebook group (opens Facebook)" title="Join our whānau Facebook group">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9.5" r="2.4"/><path d="M3 19c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M15.5 14.2c.5-.2 1-.2 1.5-.2 2.2 0 4 1.8 4 4"/></svg>
+<span>Our Facebook group</span>
+</a>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-client.js"></script>
+<script>
+const SVC_CATEGORIES = [
+  ['gardening', 'Gardening, lawns and land'],
+  ['building', 'Building and trades'],
+  ['cleaning', 'Cleaning and home help'],
+  ['food', 'Food and catering'],
+  ['health', 'Health and wellbeing'],
+  ['creative', 'Creative, art and design'],
+  ['professional', 'Professional and business services'],
+  ['transport', 'Transport and delivery'],
+  ['education', 'Teaching, tutoring and te reo'],
+  ['other', 'Something else']
+];
+const SVC_LABEL = {};
+SVC_CATEGORIES.forEach((c) => { SVC_LABEL[c[0]] = c[1]; });
+
+let me = null;            // { id, isAdmin }
+let allServices = [];
+let branchNameById = {};
+let activeCategory = '';
+let editingId = null;
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+const $ = (id) => document.getElementById(id);
+
+// ---- Cleaning up what people type ----
+function cleanWebsite(v) {
+  v = (v || '').trim();
+  if (!v) return { value: null };
+  if (!/^https?:\/\//i.test(v)) v = 'https://' + v;
+  try {
+    const u = new URL(v);
+    if (!/^https?:$/.test(u.protocol) || !u.hostname.includes('.')) return { error: 'That website or Facebook address does not look right.' };
+    return { value: u.href };
+  } catch (e) {
+    return { error: 'That website or Facebook address does not look right.' };
+  }
+}
+function cleanEmail(v) {
+  v = (v || '').trim();
+  if (!v) return { value: null };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return { error: 'That email address does not look right.' };
+  return { value: v };
+}
+
+// ---- Listing cards ----
+function contactHtml(s) {
+  const bits = [];
+  if (s.phone) {
+    const tel = s.phone.replace(/[^\d+]/g, '');
+    bits.push(tel ? `<div>Phone: <a href="tel:${esc(tel)}">${esc(s.phone)}</a></div>` : `<div>Phone: ${esc(s.phone)}</div>`);
+  }
+  if (s.email) bits.push(`<div>Email: <a href="mailto:${esc(s.email)}">${esc(s.email)}</a></div>`);
+  if (s.website && /^https?:\/\//i.test(s.website)) {
+    const shown = s.website.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+    bits.push(`<div>Web: <a href="${esc(s.website)}" target="_blank" rel="noopener noreferrer">${esc(shown)}</a></div>`);
+  }
+  if (!bits.length) return '<div class="help-text">No contact details added. Ask in the <a href="forum.html" style="text-decoration: underline;">Forum</a> or through your branch.</div>';
+  return bits.join('');
+}
+
+function cardHtml(s) {
+  const mine = me && s.owner_id === me.id;
+  const branch = branchNameById[s.branch_id];
+  const actions = [];
+  if (mine) {
+    actions.push(`<button type="button" class="btn btn-outline" data-edit="${esc(s.id)}">Edit</button>`);
+    actions.push(`<button type="button" class="btn btn-outline" data-delete="${esc(s.id)}">Delete</button>`);
+  }
+  if (me && me.isAdmin) {
+    actions.push(`<button type="button" class="btn btn-outline" data-hide="${esc(s.id)}">${s.hidden ? 'Show again' : 'Hide'}</button>`);
+    if (!mine) actions.push(`<button type="button" class="btn btn-outline" data-delete="${esc(s.id)}">Delete</button>`);
+  }
+  const flag = s.hidden
+    ? `<span class="svc-flag">${mine && !(me && me.isAdmin) ? 'Hidden by an admin. Only you can see this.' : 'Hidden from members'}</span>`
+    : '';
+  return `<div class="card svc-card${s.hidden ? ' is-hidden' : ''}">
+    <div class="svc-cat">${esc(SVC_LABEL[s.category] || SVC_LABEL.other)}</div>
+    <h3>${esc(s.title)}</h3>
+    ${flag}
+    <p class="svc-desc">${esc(s.description)}</p>
+    ${s.area ? `<div class="svc-area">Works in: ${esc(s.area)}</div>` : ''}
+    <div class="svc-contact">${contactHtml(s)}</div>
+    <div class="svc-by">Listed by ${esc(s.owner_name || 'a member')}${branch ? ' · ' + esc(branch) : ''}${mine ? ' (you)' : ''}</div>
+    ${actions.length ? `<div class="svc-actions">${actions.join('')}</div>` : ''}
+  </div>`;
+}
+
+function render() {
+  const q = $('svc-search').value.trim().toLowerCase();
+  const list = allServices.filter((s) => {
+    if (activeCategory && (SVC_LABEL[s.category] ? s.category : 'other') !== activeCategory) return false;
+    if (!q) return true;
+    return [s.title, s.description, s.area, s.owner_name, SVC_LABEL[s.category]].join(' ').toLowerCase().includes(q);
+  });
+  $('svc-grid').innerHTML = list.map(cardHtml).join('');
+  const total = allServices.length;
+  $('svc-count').textContent = total === 0
+    ? 'No listings yet. Be the first to add one.'
+    : (list.length === total ? `${total} ${total === 1 ? 'listing' : 'listings'}` : `${list.length} of ${total} listings`);
+  if (total > 0 && list.length === 0) {
+    $('svc-grid').innerHTML = '<div class="help-text">Nothing matches that. Try a shorter search, or choose All.</div>';
+  }
+}
+
+function renderChips() {
+  const items = [['', 'All']].concat(SVC_CATEGORIES);
+  $('svc-chips').innerHTML = items.map((i) =>
+    `<button type="button" class="gloss-chip" data-cat="${esc(i[0])}" aria-pressed="${i[0] === activeCategory}">${esc(i[1])}</button>`).join('');
+}
+
+// ---- Loading ----
+async function loadServices() {
+  const { data, error } = await sb.rpc('list_whanau_services');
+  if (error) {
+    $('svc-count').textContent = '';
+    $('svc-grid').innerHTML = '<div class="card" style="grid-column: 1 / -1;"><p style="margin:0;">The Services page is not switched on yet. An admin needs to run database update #21.</p></div>';
+    $('svc-add').classList.add('hidden');
+    return;
+  }
+  allServices = data || [];
+  render();
+}
+
+// ---- Form ----
+function openForm(s) {
+  editingId = s ? s.id : null;
+  $('svc-form-title').textContent = s ? 'Edit my listing' : 'Add my listing';
+  $('svc-title').value = s ? s.title : '';
+  $('svc-category').value = s && SVC_LABEL[s.category] ? s.category : 'other';
+  $('svc-desc').value = s ? s.description : '';
+  $('svc-area').value = s && s.area ? s.area : '';
+  $('svc-phone').value = s && s.phone ? s.phone : '';
+  $('svc-email').value = s && s.email ? s.email : '';
+  $('svc-website').value = s && s.website ? s.website : '';
+  $('svc-desc-count').textContent = $('svc-desc').value.length;
+  $('svc-error').classList.add('hidden');
+  $('svc-form').classList.remove('hidden');
+  $('svc-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('svc-title').focus();
+}
+function closeForm() {
+  $('svc-form').classList.add('hidden');
+  editingId = null;
+}
+function formError(msg) {
+  $('svc-error').textContent = msg;
+  $('svc-error').classList.remove('hidden');
+}
+
+async function saveListing(e) {
+  e.preventDefault();
+  $('svc-error').classList.add('hidden');
+  const title = $('svc-title').value.trim();
+  const description = $('svc-desc').value.trim();
+  if (title.length < 2) return formError('Please add a business name, or what you do.');
+  if (description.length < 5) return formError('Please tell whānau what you can help with.');
+  const web = cleanWebsite($('svc-website').value);
+  if (web.error) return formError(web.error);
+  const mail = cleanEmail($('svc-email').value);
+  if (mail.error) return formError(mail.error);
+
+  const row = {
+    title,
+    category: $('svc-category').value || 'other',
+    description,
+    area: $('svc-area').value.trim() || null,
+    phone: $('svc-phone').value.trim() || null,
+    email: mail.value,
+    website: web.value
+  };
+
+  const btn = $('svc-save');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    if (!(await forumTextOk([row.title, row.description, row.area].filter(Boolean).join(' ')))) {
+      return formError(FORUM_REWORD_MESSAGE);
+    }
+    const { error } = editingId
+      ? await sb.from('whanau_services').update(row).eq('id', editingId)
+      : await sb.from('whanau_services').insert(Object.assign({ owner_id: me.id }, row));
+    if (error) return formError(forumErrorText(error, 'Could not save that. Please try again.'));
+    closeForm();
+    await loadServices();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save listing';
+  }
+}
+
+async function onGridClick(e) {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const editId = btn.getAttribute('data-edit');
+  const delId = btn.getAttribute('data-delete');
+  const hideId = btn.getAttribute('data-hide');
+  if (editId) {
+    const s = allServices.find((x) => x.id === editId);
+    if (s) openForm(s);
+  } else if (delId) {
+    if (!confirm('Delete this listing? This cannot be undone.')) return;
+    const { error } = await sb.from('whanau_services').delete().eq('id', delId);
+    if (error) { alert('Could not delete that. ' + error.message); return; }
+    await loadServices();
+  } else if (hideId) {
+    const s = allServices.find((x) => x.id === hideId);
+    if (!s) return;
+    const { error } = await sb.from('whanau_services').update({ hidden: !s.hidden }).eq('id', hideId);
+    if (error) { alert('Could not do that. ' + error.message); return; }
+    await loadServices();
+  }
+}
+
+async function init() {
+  const status = await initAccessGate();
+  if (!status.approved) return;
+  me = { id: status.session.user.id, isAdmin: !!status.isAdmin };
+  $('page-content').classList.remove('hidden');
+
+  $('svc-category').innerHTML = SVC_CATEGORIES.map((c) => `<option value="${esc(c[0])}">${esc(c[1])}</option>`).join('');
+  renderChips();
+
+  const { data: branches } = await sb.from('branches').select('id, name');
+  (branches || []).forEach((b) => { branchNameById[b.id] = b.name; });
+
+  $('svc-search').addEventListener('input', render);
+  $('svc-chips').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-cat]');
+    if (!b) return;
+    activeCategory = b.getAttribute('data-cat');
+    $('svc-chips').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    render();
+  });
+  $('svc-add').addEventListener('click', () => openForm(null));
+  $('svc-cancel').addEventListener('click', closeForm);
+  $('svc-form').addEventListener('submit', saveListing);
+  $('svc-desc').addEventListener('input', () => { $('svc-desc-count').textContent = $('svc-desc').value.length; });
+  $('svc-grid').addEventListener('click', onGridClick);
+
+  await loadServices();
+}
+init();
+</script>
+</body>
+</html>

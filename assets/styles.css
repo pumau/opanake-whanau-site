@@ -427,3 +427,33 @@ main{ flex: 1; width: 100%; }
   .footer{ padding-bottom: 48px; }
   .footer-social{ margin-left: auto; }
 }
+
+/* Whānau services page */
+.svc-tools{ display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 4px 0 8px; }
+.svc-tools input[type=search]{ flex: 1; min-width: 220px; font: inherit; font-size: 14px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--ink); }
+.svc-chips{ display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+.svc-form{ margin: 18px 0 8px; max-width: 720px; }
+.svc-form h2{ font-size: 19px; margin: 0 0 14px; }
+.svc-form .field input, .svc-form .field select, .svc-form .field textarea{ width: 100%; box-sizing: border-box; }
+.svc-form-row{ display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 0 16px; }
+.svc-form-actions{ display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; }
+.svc-privacy{ background: var(--surface-2, #F1EDE5); border-radius: 12px; padding: 12px 16px; font-size: 13.5px; margin: 6px 0 16px; line-height: 1.55; }
+.svc-count{ font-size: 13px; margin: 10px 0 12px; }
+.svc-grid{ display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.svc-card{ display: flex; flex-direction: column; gap: 10px; padding: 20px 22px; }
+.svc-card.is-hidden{ opacity: 0.8; border-style: dashed; }
+.svc-cat{ font-size: 11.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--accent-2); }
+.svc-card h3{ font-family: 'Fraunces', serif; font-size: 19px; margin: 0; color: var(--accent-dark); overflow-wrap: anywhere; }
+.svc-desc{ margin: 0; font-size: 14.5px; line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
+.svc-area{ font-size: 13.5px; color: var(--ink-soft); }
+.svc-contact{ display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.svc-contact a{ color: var(--accent-dark); font-weight: 600; text-decoration: underline; overflow-wrap: anywhere; }
+.svc-by{ margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); font-size: 13px; color: var(--ink-soft); }
+.svc-actions{ display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.svc-actions .btn{ padding: 7px 14px; font-size: 13px; }
+.svc-flag{ display: inline-block; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--accent-2-soft); color: #8A5A16; width: fit-content; }
+@media (max-width: 560px){
+  .svc-form-row{ grid-template-columns: 1fr; }
+  .svc-grid{ grid-template-columns: 1fr; }
+}
+.svc-form .error-text{ margin: 0 0 12px; }
