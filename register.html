@@ -64,6 +64,16 @@
 </select>
 <span class="help-text">Not sure? Choose "Not sure / help me work it out" and an admin will help sort it at approval time.</span>
 </div>
+<div class="field">
+<label for="su-succession">Have you succeeded to an interest in our land?</label>
+<select id="su-succession" required>
+<option value="" disabled selected>Choose one…</option>
+<option value="yes">Yes, I have succeeded</option>
+<option value="no">No, not yet</option>
+<option value="not_sure">Not sure</option>
+</select>
+<span class="help-text">Succession is the court step that puts you on the record as an owner. Not sure? That's fine, choose "Not sure". Your answer is shown on your card to other approved members, and an admin can update it for you later.</span>
+</div>
 <div id="signup-error" class="error-text hidden"></div>
 <div id="signup-success" class="hidden" style="background: var(--river-soft); border: 1px solid var(--river); border-radius: 10px; padding: 14px 16px; font-size: 13.5px; margin-bottom: 16px;"></div>
 <button type="submit" id="signup-btn" class="btn">Create my account</button>
@@ -186,11 +196,12 @@ signupForm.addEventListener('submit', async (e) => {
   const email = document.getElementById('su-email').value.trim();
   const password = document.getElementById('su-password').value;
   const branchId = document.getElementById('su-branch').value || null;
+  const successionStatus = document.getElementById('su-succession').value || null;
 
   const { data, error } = await sb.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName, branch_id: branchId } }
+    options: { data: { full_name: fullName, branch_id: branchId, succession_status: successionStatus } }
   });
 
   btn.disabled = false;

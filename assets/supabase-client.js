@@ -143,6 +143,16 @@ function safeFileName(name) {
 // Branches are named for the sibling and carry their birth year in brackets,
 // e.g. "Pua Howearth (1924)". The site lists them oldest first by that year;
 // any without a year in the name keep their usual order after the dated ones.
+// Succession status badge (shown on member cards). Empty when not recorded.
+const SUCCESSION_LABELS = { yes: 'Succeeded', no: 'Not yet succeeded', not_sure: 'Succession: not sure' };
+function successionBadge(value) {
+  const label = SUCCESSION_LABELS[value];
+  if (!label) return '';
+  const style = value === 'yes' ? 'badge badge-approved' : 'badge';
+  const extra = value === 'yes' ? '' : ' style="background: var(--surface-2); color: var(--ink-soft);"';
+  return `<span class="${style}"${extra} title="Has this person succeeded to interests in our land?">${label}</span>`;
+}
+
 function branchYear(name) {
   const m = /\((\d{4})\)/.exec(String(name || ''));
   return m ? parseInt(m[1], 10) : null;

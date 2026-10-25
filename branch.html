@@ -146,7 +146,7 @@ async function loadBranch() {
     } else {
       memberListEl.innerHTML = members
         .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))
-        .map((m) => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;">${escapeHtml(m.full_name || 'Unnamed member')}</div>`)
+        .map((m) => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;"><span>${escapeHtml(m.full_name || 'Unnamed member')}</span>${successionBadge(m.succession_status)}</div>`)
         .join('');
     }
   }

@@ -46,6 +46,7 @@
 <div style="margin-top: 10px; display:flex; align-items:center; gap: 10px; flex-wrap: wrap;">
 <span id="p-status" class="badge badge-pending">Pending approval</span>
 <span id="p-branch" class="help-text"></span>
+<span id="p-succession"></span>
 </div>
 </div>
 <button id="logout-btn" class="btn btn-outline">Log out</button>
@@ -62,7 +63,7 @@
 
 <div id="admin-members" class="hidden" style="margin-top: 32px;">
 <h2 style="font-size: 19px;">All members</h2>
-<p class="help-text" style="margin-top: 4px;">Set or change anyone's branch here — including anyone who signed up as "not sure".</p>
+<p class="help-text" style="margin-top: 4px;">Set or change anyone's branch here — including anyone who signed up as "not sure". You can also set whether someone has succeeded, which shows on their card for all approved members.</p>
 <div id="members-list" style="display: flex; flex-direction: column; gap: 12px; margin-top: 14px;">
 <div class="help-text">Loading…</div>
 </div>
@@ -90,11 +91,19 @@ async function loadProfile() {
     return;
   }
 
-  const { data: profile, error } = await sb
+  let { data: profile, error } = await sb
     .from('profiles')
-    .select('full_name, status, joined_at, branches(name)')
+    .select('full_name, status, joined_at, succession_status, branches(name)')
     .eq('id', session.user.id)
     .single();
+  if (error) {
+    // succession column not added yet (database update #20): load without it
+    ({ data: profile, error } = await sb
+      .from('profiles')
+      .select('full_name, status, joined_at, branches(name)')
+      .eq('id', session.user.id)
+      .single());
+  }
 
   document.getElementById('signed-in').classList.remove('hidden');
 
@@ -122,9 +131,10 @@ async function loadProfile() {
 
   const branchName = profile.branches && profile.branches.name;
   document.getElementById('p-branch').textContent = branchName ? branchName + ' branch' : '';
+  document.getElementById('p-succession').innerHTML = successionBadge(profile.succession_status);
 
   document.getElementById('p-note').textContent = profile.status === 'approved'
-    ? 'You have full access to the members’ area as it comes online.'
+    ? 'You have full access to the members’ area as it comes online.' + (profile.succession_status ? ' Other approved members can see whether you have succeeded on your card. To change that answer, ask an admin.' : '')
     : 'An admin needs to approve your account before you get full access to the members’ area — hang tight.';
 }
 
@@ -147,11 +157,18 @@ function formatDate(iso) {
 let allBranches = [];
 
 async function renderPending() {
-  const { data: pending, error } = await sb
+  let { data: pending, error } = await sb
     .from('profiles')
-    .select('id, full_name, branch_id, joined_at, branches(name)')
+    .select('id, full_name, branch_id, joined_at, succession_status, branches(name)')
     .eq('status', 'pending')
     .order('joined_at');
+  if (error) {
+    ({ data: pending, error } = await sb
+      .from('profiles')
+      .select('id, full_name, branch_id, joined_at, branches(name)')
+      .eq('status', 'pending')
+      .order('joined_at'));
+  }
 
   const listEl = document.getElementById('pending-list');
 
@@ -172,6 +189,7 @@ async function renderPending() {
       <div>
         <div style="font-weight:600; font-size:14.5px;">${escapeHtml(p.full_name || 'Unnamed member')}</div>
         <div class="help-text" style="margin-top:2px;">${escapeHtml((p.branches && p.branches.name) || 'No branch set')} · registered ${formatDate(p.joined_at)}</div>
+        ${p.succession_status ? '<div style="margin-top:6px;">' + successionBadge(p.succession_status) + '</div>' : ''}
       </div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
         <select data-branch-select="${p.id}" style="font:inherit; font-size:13px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg);">${branchOptions}</select>
@@ -206,11 +224,19 @@ async function renderPending() {
 }
 
 async function renderMembers() {
-  const { data: members, error } = await sb
+  let { data: members, error } = await sb
     .from('profiles')
-    .select('id, full_name, branch_id, joined_at')
+    .select('id, full_name, branch_id, joined_at, succession_status')
     .eq('status', 'approved')
     .order('full_name');
+  const hasSuccession = !error;
+  if (error) {
+    ({ data: members, error } = await sb
+      .from('profiles')
+      .select('id, full_name, branch_id, joined_at')
+      .eq('status', 'approved')
+      .order('full_name'));
+  }
 
   const listEl = document.getElementById('members-list');
 
@@ -228,14 +254,44 @@ async function renderMembers() {
 
   listEl.innerHTML = members.map((m) => `
     <div class="card" style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;">
-      <div style="font-weight:600; font-size:14.5px;">${escapeHtml(m.full_name || 'Unnamed member')}</div>
+      <div>
+        <div style="font-weight:600; font-size:14.5px;">${escapeHtml(m.full_name || 'Unnamed member')}</div>
+        ${hasSuccession ? '<div style="margin-top:6px;" data-succ-badge="' + m.id + '">' + successionBadge(m.succession_status) + '</div>' : ''}
+      </div>
       <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <span data-member-saved="${m.id}" class="help-text hidden" style="color: var(--accent-dark);">Saved</span>
+        ${hasSuccession ? `<select data-member-succession="${m.id}" aria-label="Succession status for ${escapeHtml(m.full_name || 'this member')}" style="font:inherit; font-size:13px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg);">
+          <option value="">Succession: not recorded</option>
+          <option value="yes">Succeeded</option>
+          <option value="no">Not yet succeeded</option>
+          <option value="not_sure">Succession: not sure</option>
+        </select>` : ''}
         <select data-member-branch="${m.id}" style="font:inherit; font-size:13px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg);">${branchOptions}</select>
       </div>
     </div>`).join('');
 
   members.forEach((m) => {
+    const succ = document.querySelector(`[data-member-succession="${m.id}"]`);
+    if (succ) {
+      succ.value = m.succession_status || '';
+      succ.addEventListener('change', async () => {
+        const value = succ.value || null;
+        const { error: succError } = await sb.from('profiles').update({ succession_status: value }).eq('id', m.id);
+        if (succError) {
+          succ.value = m.succession_status || '';
+          alert('Could not save that. Try again, or check database update #20 has been run.');
+          return;
+        }
+        m.succession_status = value;
+        const badgeEl = document.querySelector(`[data-succ-badge="${m.id}"]`);
+        if (badgeEl) badgeEl.innerHTML = successionBadge(value);
+        const savedEl = document.querySelector(`[data-member-saved="${m.id}"]`);
+        if (savedEl) {
+          savedEl.classList.remove('hidden');
+          setTimeout(() => savedEl.classList.add('hidden'), 1500);
+        }
+      });
+    }
     const select = document.querySelector(`[data-member-branch="${m.id}"]`);
     if (select && m.branch_id) select.value = m.branch_id;
   });

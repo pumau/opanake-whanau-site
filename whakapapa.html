@@ -137,7 +137,7 @@ function renderDirectory() {
   });
 
   document.getElementById('directory-count').textContent =
-    `Showing ${members.length} of ${allMembers.length} registered whānau. Only your name, branch and join date are visible to others. Nothing else from your profile is shared here.`;
+    `Showing ${members.length} of ${allMembers.length} registered whānau. Only your name, branch, join date and whether you have succeeded are visible to others. Nothing else from your profile is shared here.`;
 
   grid.innerHTML = members
     .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))
@@ -149,6 +149,7 @@ function renderDirectory() {
         <div>
           <div style="font-weight:600;font-size:14px;">${escapeHtml(m.full_name || 'Unnamed member')}</div>
           <div class="help-text" style="margin-top:2px;">${escapeHtml(branchName)}${year ? ' · since ' + year : ''}</div>
+          ${m.succession_status ? '<div style="margin-top:6px;">' + successionBadge(m.succession_status) + '</div>' : ''}
         </div>
       </div>`;
     }).join('');
