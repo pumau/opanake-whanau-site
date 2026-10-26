@@ -56,8 +56,8 @@
 <div id="p-email-box" class="hidden" style="margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border, #e3dccf);">
 <label style="display:flex; align-items:flex-start; gap: 10px; cursor: pointer;">
 <input type="checkbox" id="p-email-forum" style="margin-top: 4px;">
-<span><strong>Email me about new forum topics</strong><br>
-<span class="help-text">We will email you when someone starts a new topic. The email only gives the title and a link, you log in to read it. Replies are not emailed. Untick this any time to stop.</span></span>
+<span><strong>Email me a daily update</strong><br>
+<span class="help-text">One email a day, around 7am, and only when something is new. It lists new forum topics and new photos, with links. It does not include what anyone wrote, you log in to read it. Untick this any time to stop.</span></span>
 </label>
 <p id="p-email-msg" class="help-text" style="margin-top: 8px;"></p>
 </div>
@@ -168,7 +168,7 @@ async function loadEmailPreference(userId) {
       msg.textContent = "Couldn't save that. Please try again.";
       return;
     }
-    msg.textContent = want ? 'Saved. We will email you about new forum topics.' : 'Saved. You will not get forum emails.';
+    msg.textContent = want ? 'Saved. You will get a daily update when something is new.' : 'Saved. You will not get daily update emails.';
   });
 }
 
