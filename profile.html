@@ -53,6 +53,14 @@
 <button id="logout-btn" class="btn btn-outline">Log out</button>
 </div>
 <p id="p-note" class="help-text" style="margin-top: 18px;"></p>
+<div id="p-email-box" class="hidden" style="margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border, #e3dccf);">
+<label style="display:flex; align-items:flex-start; gap: 10px; cursor: pointer;">
+<input type="checkbox" id="p-email-forum" style="margin-top: 4px;">
+<span><strong>Email me about new forum topics</strong><br>
+<span class="help-text">We will email you when someone starts a new topic. The email only gives the title and a link, you log in to read it. Replies are not emailed. Untick this any time to stop.</span></span>
+</label>
+<p id="p-email-msg" class="help-text" style="margin-top: 8px;"></p>
+</div>
 </div>
 
 <div id="admin-approvals" class="hidden" style="margin-top: 32px;">
@@ -134,9 +142,34 @@ async function loadProfile() {
   document.getElementById('p-branch').textContent = branchName ? branchName + ' branch' : '';
   document.getElementById('p-succession').innerHTML = successionBadge(profile.succession_status);
 
+  if (profile.status === 'approved') loadEmailPreference(session.user.id);
+
   document.getElementById('p-note').textContent = profile.status === 'approved'
     ? 'You have full access to the members’ area as it comes online.' + (profile.succession_status ? ' Other approved members can see whether you have succeeded on your card. To change that answer, ask an admin.' : '')
     : 'An admin needs to approve your account before you get full access to the members’ area — hang tight.';
+}
+
+async function loadEmailPreference(userId) {
+  // Needs database update #25. If it isn't there yet, the tick box stays hidden.
+  const { data, error } = await sb.from('profiles').select('email_forum').eq('id', userId).single();
+  if (error || !data) return;
+  const box = document.getElementById('p-email-forum');
+  box.checked = !!data.email_forum;
+  document.getElementById('p-email-box').classList.remove('hidden');
+  box.addEventListener('change', async () => {
+    const msg = document.getElementById('p-email-msg');
+    const want = box.checked;
+    box.disabled = true;
+    msg.textContent = '';
+    const { error: saveError } = await sb.rpc('set_forum_email_preference', { want });
+    box.disabled = false;
+    if (saveError) {
+      box.checked = !want;
+      msg.textContent = "Couldn't save that. Please try again.";
+      return;
+    }
+    msg.textContent = want ? 'Saved. We will email you about new forum topics.' : 'Saved. You will not get forum emails.';
+  });
 }
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
