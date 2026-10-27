@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What's on | Ōpanake 1C South 6B</title>
+<meta name="description" content="Upcoming Ōpanake 1C South 6B whānau meetings and hui. Register to see the full details.">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="header">
+<a href="index.html" class="logo">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V6"/><path d="M12 6c0-3 2.5-4.5 5-4.5-0.5 3-2.5 5-5 5"/><path d="M12 10c0-3 2.8-4.7 5.6-4.7-0.6 3.1-2.8 5.2-5.6 5.2"/><path d="M12 6c0-3-2.5-4.5-5-4.5 0.5 3 2.5 5 5 5"/><path d="M12 10c0-3-2.8-4.7-5.6-4.7 0.6 3.1 2.8 5.2 5.6 5.2"/></svg>
+Ōpanake 1C South 6B
+</a>
+<nav class="nav">
+<a href="index.html">Home</a>
+<a href="whakapapa.html">Whakapapa</a>
+<a href="events.html">Hui</a>
+<a href="forum.html">Forum</a>
+<a href="archive.html">Archive</a>
+<a href="resources.html">MLC</a>
+<a href="photos.html">Photos</a>
+<a href="raffles.html">Raffles</a>
+<a href="services.html">Services</a>
+<a href="register.html" class="pill" data-nav="login-pill">Register / Login</a>
+<a href="profile.html" class="avatar" data-nav="profile-icon">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EEEBE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+</a>
+</nav>
+</header>
+
+<main>
+
+<div class="hero" style="padding-bottom: 8px;">
+<div class="eyebrow">Open to everyone</div>
+<h1 style="font-size: 32px; margin-top: 8px;">What's on</h1>
+<p>Upcoming whānau meetings and hui. This page shows the title, date and time only. To see where, the agenda and everything else on the site, you need to register and be approved.</p>
+</div>
+
+<div class="container" style="padding-top: 12px; padding-bottom: 56px; max-width: 800px; margin-left: 0; margin-right: auto;">
+
+<div id="public-list" style="display: flex; flex-direction: column; gap: 14px;">
+<div class="help-text">Loading…</div>
+</div>
+
+<div id="join-card" class="card card-muted" style="margin-top: 28px;">
+<h2 id="join-title" style="font-size: 18px;">Want to join in?</h2>
+<p id="join-text" style="margin-top: 8px;">Register to see the full calendar, the places, the agendas and the rest of the whānau site. An admin approves each new member.</p>
+<a id="join-btn" href="register.html" class="btn" style="margin-top: 14px; display: inline-flex;">Register / log in</a>
+</div>
+
+</div>
+</main>
+
+<footer class="footer">
+<img class="footer-map" src="assets/footer-map.jpg" alt="Aerial map of the Ōpanake 1C South blocks near Mamaranui, Kaihu" loading="lazy">
+© Ōpanake 1C South 6B whānau
+<a class="footer-social" href="https://www.facebook.com/groups/308139352992651" target="_blank" rel="noopener noreferrer" aria-label="Join our whānau Facebook group (opens Facebook)" title="Join our whānau Facebook group">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9.5" r="2.4"/><path d="M3 19c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M15.5 14.2c.5-.2 1-.2 1.5-.2 2.2 0 4 1.8 4 4"/></svg>
+<span>Our Facebook group</span>
+</a>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-client.js"></script>
+<script>
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+
+function formatDate(d) {
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function cardHtml(e) {
+  const badge = e.event_type === 'meeting'
+    ? '<span class="badge badge-pending">Meeting</span>'
+    : '<span class="badge badge-pending" style="background: var(--river-soft); color: var(--river);">Event</span>';
+  const when = formatDate(e.event_date) + (e.event_time ? ' · ' + escapeHtml(e.event_time) : '');
+  return `
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <span style="font-weight:600; font-size:16px;">${escapeHtml(e.title)}</span>
+        ${badge}
+      </div>
+      <div class="help-text" style="margin-top:6px; font-size:14px;">${when}</div>
+    </div>`;
+}
+
+async function loadPublicEvents() {
+  const el = document.getElementById('public-list');
+  const { data, error } = await sb.rpc('list_public_events');
+  if (error) {
+    el.innerHTML = '<p class="help-text">Nothing is listed here yet. Please check back soon.</p>';
+    return;
+  }
+  el.innerHTML = (data && data.length)
+    ? data.map(cardHtml).join('')
+    : '<p class="help-text">Nothing is listed publicly right now. Check back soon, or register to see the full calendar.</p>';
+}
+
+async function setupJoinCard() {
+  try {
+    const status = await getMemberStatus();
+    const btn = document.getElementById('join-btn');
+    if (status.approved) {
+      document.getElementById('join-title').textContent = 'Kia ora, welcome back';
+      document.getElementById('join-text').textContent = 'The full calendar, with places, agendas and minutes, is on the Hui page.';
+      btn.textContent = 'Open the Hui page';
+      btn.href = 'events.html';
+    } else if (status.session) {
+      document.getElementById('join-title').textContent = 'Waiting on approval';
+      document.getElementById('join-text').textContent = 'An admin needs to approve your account before you can see the full calendar.';
+      btn.textContent = 'View my profile';
+      btn.href = 'profile.html';
+    }
+  } catch (e) { /* keep the register prompt */ }
+}
+
+loadPublicEvents();
+setupJoinCard();
+</script>
+</body>
+</html>

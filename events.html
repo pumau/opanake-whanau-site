@@ -37,6 +37,7 @@
 <h2 id="access-gate-title" style="font-size:19px;">—</h2>
 <p id="access-gate-text" style="margin-top:10px;"></p>
 <a id="access-gate-btn" href="register.html" class="btn" style="margin-top:14px; display:inline-flex;">Register / log in</a>
+<a href="whats-on.html" class="btn btn-outline" style="margin-top:14px; margin-left:10px; display:inline-flex;">See what's on</a>
 </div>
 </div>
 
@@ -103,6 +104,10 @@
 <label for="a-description">Description (optional)</label>
 <input id="a-description" type="text">
 </div>
+<div class="field hidden" id="a-public-field">
+<label style="display:flex; align-items:flex-start; gap:8px; font-weight:500;"><input type="checkbox" id="a-public" style="width:auto; margin-top:4px;"> <span>Show on the public page</span></label>
+<span class="help-text">Anyone can then see the title, date and time on the What's on page without registering. The place, description, agenda and notes stay private. A meeting needs a date to show there.</span>
+</div>
 <div id="a-error" class="error-text hidden"></div>
 <button type="submit" id="a-submit" class="btn">Add meeting</button>
 </form>
@@ -153,7 +158,8 @@ function slugify(s) {
 let session = null;
 let isAdmin = false;
 let nameById = {};
-let items = [];                 // events and meetings, one shape
+let items = [];                          // events and meetings, one shape
+let publicReady = false;                 // true once database update #27 is run
 let agendaByMeeting = {};
 let notesByMeeting = {};
 const openMeetings = new Set(); // which meetings are expanded
@@ -167,10 +173,18 @@ async function loadNames() {
 // ---- Loading: one list made of events plus meetings -------------------------
 
 async function loadAll() {
-  const { data: events, error: evError } = await sb
+  // show_public needs database update #27; load without it until that is run.
+  let { data: events, error: evError } = await sb
     .from('events')
-    .select('id, title, description, location, event_date, event_time, event_type, meeting_id')
+    .select('id, title, description, location, event_date, event_time, event_type, meeting_id, show_public')
     .order('event_date');
+  publicReady = !evError;
+  if (evError) {
+    ({ data: events, error: evError } = await sb
+      .from('events')
+      .select('id, title, description, location, event_date, event_time, event_type, meeting_id')
+      .order('event_date'));
+  }
 
   const { data: meetings, error: mtError } = await sb
     .from('meetings')
@@ -199,19 +213,20 @@ async function loadAll() {
 
   items = [];
   events.filter((e) => e.event_type !== 'meeting').forEach((e) => {
-    items.push({ kind: 'event', id: e.id, title: e.title, date: e.event_date, time: e.event_time, location: e.location, description: e.description });
+    items.push({ kind: 'event', id: e.id, calId: e.id, showPublic: !!e.show_public, title: e.title, date: e.event_date, time: e.event_time, location: e.location, description: e.description });
   });
   meetings.forEach((m) => {
     const row = calendarRowByMeeting[m.id];
     items.push({
       kind: 'meeting', id: m.id, title: m.title, date: m.meeting_date || null,
       time: row && row.event_time, location: row && row.location, description: row && row.description,
+      calId: row ? row.id : null, showPublic: !!(row && row.show_public),
       status: m.status, created_at: m.created_at
     });
   });
   // Calendar entries of type "meeting" that point at no meeting (old data) still show.
   events.filter((e) => e.event_type === 'meeting' && !e.meeting_id).forEach((e) => {
-    items.push({ kind: 'event', id: e.id, title: e.title, date: e.event_date, time: e.event_time, location: e.location, description: e.description });
+    items.push({ kind: 'event', id: e.id, calId: e.id, showPublic: !!e.show_public, title: e.title, date: e.event_date, time: e.event_time, location: e.location, description: e.description });
   });
   return true;
 }
@@ -278,6 +293,14 @@ function itemCard(it, isPast) {
   else if (isPast) badge = '<span class="badge badge-pending">Minutes needed</span>';
   else badge = '<span class="badge badge-pending">Meeting</span>';
 
+  const publicBadge = it.showPublic ? '<span class="badge badge-approved" title="Anyone can see the title, date and time on the What\'s on page">On the public page</span>' : '';
+  let publicControl = '';
+  if (isAdmin && publicReady) {
+    publicControl = it.calId
+      ? `<label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; font-weight:500; cursor:pointer;"><input type="checkbox" data-action="toggle-public" data-id="${it.calId}" ${it.showPublic ? 'checked' : ''} style="width:auto;"> Show on the public page (title, date and time only)</label>`
+      : '<p class="help-text" style="margin-top:10px;">Add a date to show this on the public page.</p>';
+  }
+
   const removeBtn = isAdmin
     ? `<button type="button" class="btn btn-outline" data-action="remove-${it.kind}" data-id="${it.id}" style="flex-shrink:0;">Remove</button>`
     : '';
@@ -295,9 +318,11 @@ function itemCard(it, isPast) {
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
             <span style="font-weight:600; font-size:15px;">${escapeHtml(it.title)}</span>
             ${badge}
+            ${publicBadge}
           </div>
           <div class="help-text" style="margin-top:4px;">${when}</div>
           ${it.description ? `<p style="margin:8px 0 0; font-size:13.5px;">${escapeHtml(it.description)}</p>` : ''}
+          ${publicControl}
         </div>
         ${removeBtn}
       </div>
@@ -463,6 +488,23 @@ const pastEl = document.getElementById('past-list');
   });
 });
 
+[upcomingEl, pastEl].forEach((container) => {
+  container.addEventListener('change', async (e) => {
+    const box = e.target.closest && e.target.closest('input[data-action="toggle-public"]');
+    if (!box || !isAdmin) return;
+    const want = box.checked;
+    box.disabled = true;
+    const { error } = await sb.from('events').update({ show_public: want }).eq('id', box.getAttribute('data-id'));
+    if (error) {
+      box.checked = !want;
+      box.disabled = false;
+      alert("Couldn't change that. " + error.message);
+      return;
+    }
+    await reload();
+  });
+});
+
 document.getElementById('f-type').addEventListener('change', render);
 document.getElementById('f-search').addEventListener('input', render);
 
@@ -495,6 +537,7 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   const time = document.getElementById('a-time').value.trim();
   const location = document.getElementById('a-location').value.trim();
   const description = document.getElementById('a-description').value.trim();
+  const makePublic = isAdmin && document.getElementById('a-public').checked;
 
   if (!title || (type === 'event' && !date)) {
     errorEl.textContent = type === 'event' ? 'Add a title and a date.' : 'Give the meeting a title first.';
@@ -510,7 +553,8 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   if (type === 'event') {
     ({ error } = await sb.from('events').insert({
       title, event_date: date, event_time: time || null, location: location || null,
-      description: description || null, event_type: 'event', created_by: session.user.id
+      description: description || null, event_type: 'event', created_by: session.user.id,
+      ...(makePublic ? { show_public: true } : {})
     }));
   } else {
     const res = await sb.from('meetings').insert({ title, meeting_date: date || null, created_by: session.user.id }).select('id').single();
@@ -519,7 +563,8 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
     if (!error && date) {
       await sb.from('events').insert({
         title, event_date: date, event_time: time || null, location: location || null,
-        description: description || null, event_type: 'meeting', meeting_id: res.data.id, created_by: session.user.id
+        description: description || null, event_type: 'meeting', meeting_id: res.data.id, created_by: session.user.id,
+        ...(makePublic ? { show_public: true } : {})
       });
     }
     if (!error) openMeetings.add(res.data.id);
@@ -529,7 +574,7 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   btn.textContent = label;
 
   if (error) {
-    errorEl.textContent = error.message;
+    errorEl.textContent = /show_public/.test(error.message || '') ? 'The public page needs database update #27 first. Untick "Show on the public page" for now.' : error.message;
     errorEl.classList.remove('hidden');
     return;
   }
@@ -552,6 +597,7 @@ async function init() {
     document.getElementById('type-hint').textContent = 'Meetings can be added by anyone. Events are added by an admin.';
   } else {
     document.getElementById('type-hint').textContent = 'Meetings have an agenda, notes and minutes. Events are for hui, working bees and fundraisers.';
+    document.getElementById('a-public-field').classList.remove('hidden');
   }
   syncAddForm();
 
