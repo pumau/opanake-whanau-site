@@ -63,6 +63,31 @@
 </div>
 </div>
 
+<div id="invite-card" class="card hidden" style="margin-top: 20px;">
+<h2 style="font-size: 18px;">Invite your whānau</h2>
+<p class="help-text" style="margin-top: 6px;">Know whānau who should be here? Send them your personal link, or we can email it for you. They still need an admin to approve them, and the admins will see that you invited them.</p>
+<div style="display:flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
+<input id="inv-link" type="text" readonly aria-label="Your personal invite link" style="flex: 1; min-width: 220px; font: inherit; font-size: 13.5px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink);">
+<button type="button" id="inv-copy" class="btn btn-outline">Copy link</button>
+</div>
+<p id="inv-copy-msg" class="help-text" style="margin-top: 6px;"></p>
+<form id="inv-form" style="margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border, #e3dccf);">
+<h3 style="font-size: 15px; margin: 0 0 10px;">Or we can email it for you</h3>
+<div class="field">
+<label for="inv-name">Their name (optional)</label>
+<input id="inv-name" type="text" maxlength="80" autocomplete="off">
+</div>
+<div class="field">
+<label for="inv-email">Their email</label>
+<input id="inv-email" type="email" required maxlength="200" autocomplete="off">
+</div>
+<p class="help-text" style="margin-bottom: 10px;">We only use their email to send this invitation, and delete it after 90 days.</p>
+<div id="inv-msg" class="help-text" style="margin-bottom: 10px;"></div>
+<button type="submit" id="inv-btn" class="btn">Send invitation</button>
+<span id="inv-left" class="help-text" style="margin-left: 10px;"></span>
+</form>
+</div>
+
 <div id="admin-approvals" class="hidden" style="margin-top: 32px;">
 <h2 style="font-size: 19px;">Pending members</h2>
 <div id="pending-list" style="display: flex; flex-direction: column; gap: 12px; margin-top: 14px;">
@@ -142,7 +167,7 @@ async function loadProfile() {
   document.getElementById('p-branch').textContent = branchName ? branchName + ' branch' : '';
   document.getElementById('p-succession').innerHTML = successionBadge(profile.succession_status);
 
-  if (profile.status === 'approved') loadEmailPreference(session.user.id);
+  if (profile.status === 'approved') { loadEmailPreference(session.user.id); loadInvite(); }
 
   document.getElementById('p-note').textContent = profile.status === 'approved'
     ? 'You have full access to the members’ area as it comes online.' + (profile.succession_status ? ' Other approved members can see whether you have succeeded on your card. To change that answer, ask an admin.' : '')
@@ -172,6 +197,61 @@ async function loadEmailPreference(userId) {
   });
 }
 
+async function loadInvite() {
+  // Needs database update #28. If it isn't there yet, the card stays hidden.
+  const { data: code, error } = await sb.rpc('get_my_invite_code');
+  if (error || !code) return;
+  const link = new URL('register.html', window.location.href).href.split('?')[0] + '?invite=' + encodeURIComponent(code);
+  document.getElementById('inv-link').value = link;
+  document.getElementById('invite-card').classList.remove('hidden');
+  refreshInvitesLeft();
+}
+
+async function refreshInvitesLeft() {
+  const { data: left, error } = await sb.rpc('my_invites_left');
+  const el = document.getElementById('inv-left');
+  const btn = document.getElementById('inv-btn');
+  if (error || left == null) { el.textContent = ''; return; }
+  el.textContent = left === 0 ? 'No emailed invitations left this week.' : left + (left === 1 ? ' emailed invitation' : ' emailed invitations') + ' left this week.';
+  btn.disabled = left === 0;
+}
+
+document.getElementById('inv-copy').addEventListener('click', async () => {
+  const input = document.getElementById('inv-link');
+  const msg = document.getElementById('inv-copy-msg');
+  let ok = false;
+  try { await navigator.clipboard.writeText(input.value); ok = true; } catch (e) {
+    try { input.select(); ok = document.execCommand('copy'); } catch (e2) { ok = false; }
+  }
+  msg.textContent = ok ? 'Copied. Paste it into a text, Messenger or an email.' : 'Select the link above and copy it.';
+});
+
+document.getElementById('inv-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('inv-btn');
+  const msg = document.getElementById('inv-msg');
+  const email = document.getElementById('inv-email').value.trim();
+  const name = document.getElementById('inv-name').value.trim();
+  msg.textContent = '';
+  btn.disabled = true;
+  const { data: result, error } = await sb.rpc('send_invite', { invite_email: email, invite_name: name || null });
+  btn.disabled = false;
+  const messages = {
+    bad_email: "That doesn't look like a valid email address.",
+    limit: 'You have used all your emailed invitations for this week. You can still send them your link above.',
+    not_set_up: "Emailing isn't switched on yet. Copy your link above and send it to them yourself.",
+    failed: "Couldn't send that email. Please try again, or send them your link above.",
+    not_allowed: 'Only approved members can send invitations.'
+  };
+  if (error || result !== 'sent') {
+    msg.textContent = messages[result] || "Couldn't send that invitation. Please try again.";
+  } else {
+    msg.textContent = 'Invitation sent. They still need an admin to approve them once they register.';
+    document.getElementById('inv-form').reset();
+  }
+  refreshInvitesLeft();
+});
+
 document.getElementById('logout-btn').addEventListener('click', async () => {
   await sb.auth.signOut();
   window.location.href = 'index.html';
@@ -191,11 +271,19 @@ function formatDate(iso) {
 let allBranches = [];
 
 async function renderPending() {
+  // invited_by needs database update #28; succession_status needs #20.
   let { data: pending, error } = await sb
     .from('profiles')
-    .select('id, full_name, branch_id, joined_at, succession_status, branches(name)')
+    .select('id, full_name, branch_id, joined_at, succession_status, invited_by, branches(name)')
     .eq('status', 'pending')
     .order('joined_at');
+  if (error) {
+    ({ data: pending, error } = await sb
+      .from('profiles')
+      .select('id, full_name, branch_id, joined_at, succession_status, branches(name)')
+      .eq('status', 'pending')
+      .order('joined_at'));
+  }
   if (error) {
     ({ data: pending, error } = await sb
       .from('profiles')
@@ -215,6 +303,13 @@ async function renderPending() {
     return;
   }
 
+  const inviterIds = [...new Set(pending.map((p) => p.invited_by).filter(Boolean))];
+  const inviterName = {};
+  if (inviterIds.length) {
+    const { data: inviters } = await sb.from('profiles').select('id, full_name').in('id', inviterIds);
+    (inviters || []).forEach((i) => { inviterName[i.id] = i.full_name; });
+  }
+
   const branchOptions = '<option value="">No branch set</option>' +
     allBranches.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
 
@@ -223,6 +318,7 @@ async function renderPending() {
       <div>
         <div style="font-weight:600; font-size:14.5px;">${escapeHtml(p.full_name || 'Unnamed member')}</div>
         <div class="help-text" style="margin-top:2px;">${escapeHtml((p.branches && p.branches.name) || 'No branch set')} · registered ${formatDate(p.joined_at)}</div>
+        ${p.invited_by && inviterName[p.invited_by] ? '<div class="help-text" style="margin-top:4px;">Invited by ' + escapeHtml(inviterName[p.invited_by]) + '</div>' : ''}
         ${p.succession_status ? '<div style="margin-top:6px;">' + successionBadge(p.succession_status) + '</div>' : ''}
       </div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">

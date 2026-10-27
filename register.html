@@ -39,6 +39,8 @@
 
 <div class="container" style="padding-top: 20px; padding-bottom: 56px; max-width: 560px;">
 
+<div id="invite-banner" class="hidden" style="background: var(--river-soft); border: 1px solid var(--river); border-radius: 10px; padding: 14px 16px; font-size: 14px; margin-bottom: 16px;"></div>
+
 <div class="tabs">
 <button type="button" id="tab-signup" class="active">Register</button>
 <button type="button" id="tab-login">Log in</button>
@@ -162,6 +164,20 @@ function escapeHtml(s) {
   return div.innerHTML;
 }
 
+// A personal invite link looks like register.html?invite=CODE. We keep the
+// code and pass it along when they register, so the admins can see who invited
+// them. The banner only shows the inviter's first name.
+const inviteCode = (new URLSearchParams(window.location.search).get('invite') || '').trim().slice(0, 64);
+
+async function showInviteBanner() {
+  if (!inviteCode) return;
+  const { data: firstName } = await sb.rpc('invite_inviter_first_name', { code: inviteCode });
+  const banner = document.getElementById('invite-banner');
+  banner.textContent = (firstName ? 'Kia ora. ' + firstName + ' has invited you to join the Ōpanake 1C South 6B whānau site.' : 'Kia ora. You have been invited to join the Ōpanake 1C South 6B whānau site.') +
+    ' Fill in the form below to register. An admin will approve your account.';
+  banner.classList.remove('hidden');
+}
+
 async function loadBranches() {
   const branchSelect = document.getElementById('su-branch');
   const { data: branches, error } = await sb.rpc('list_branches_for_signup');
@@ -202,7 +218,7 @@ signupForm.addEventListener('submit', async (e) => {
   const { data, error } = await sb.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName, branch_id: branchId, succession_status: successionStatus } }
+    options: { data: { full_name: fullName, branch_id: branchId, succession_status: successionStatus, ...(inviteCode ? { invite_code: inviteCode } : {}) } }
   });
 
   btn.disabled = false;
@@ -280,6 +296,7 @@ forgotForm.addEventListener('submit', async (e) => {
 });
 
 loadBranches();
+showInviteBanner();
 </script>
 </body>
 </html>
