@@ -65,9 +65,7 @@
 </div>
 <a id="doc-link-btn" href="archive.html" class="btn btn-outline">View document</a>
 </div>
-<div id="post-list" style="display: flex; flex-direction: column; gap: 16px; margin-top: 20px;"></div>
-
-<form id="reply-form" class="card" style="margin-top: 24px;">
+<form id="reply-form" class="card" style="margin-top: 20px;">
 <h2 style="font-size: 16px; margin: 0 0 14px;">Reply</h2>
 <div class="field">
 <textarea id="reply-body" required rows="4" style="font: inherit; font-size: 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); resize: vertical;"></textarea>
@@ -81,6 +79,10 @@
 <div id="reply-error" class="error-text hidden"></div>
 <button type="submit" id="reply-submit" class="btn">Post reply</button>
 </form>
+
+<p class="help-text" style="margin: 22px 0 0;">Newest posts first.</p>
+<div id="post-list" style="display: flex; flex-direction: column; gap: 16px; margin-top: 12px;"></div>
+
 </div>
 </main>
 
@@ -186,10 +188,11 @@ async function loadTopic() {
 
   document.getElementById('topic-title').textContent = topic.title;
   await showBranchNote(topic);
-  document.getElementById('post-list').innerHTML = (posts || []).map((p) => `
+  const firstPostId = (posts && posts.length) ? posts[0].id : null;  // the oldest post is the topic's opening post
+  document.getElementById('post-list').innerHTML = (posts || []).slice().reverse().map((p) => `
     <div class="card"${p.hidden ? ' style="border-style: dashed; opacity: 0.65;"' : ''}>
       <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:8px;">
-        <span style="font-weight:600; font-size:13.5px;">${escapeHtml(nameById[p.author_id] || 'A whānau member')}${p.hidden ? ' <span class="badge badge-pending" style="margin-left:6px;">Hidden from members</span>' : ''}</span>
+        <span style="font-weight:600; font-size:13.5px;">${escapeHtml(nameById[p.author_id] || 'A whānau member')}${p.id === firstPostId && posts.length > 1 ? ' <span class="badge badge-pending" style="margin-left:6px; background: var(--river-soft); color: var(--river);">Original post</span>' : ''}${p.hidden ? ' <span class="badge badge-pending" style="margin-left:6px;">Hidden from members</span>' : ''}</span>
         <span class="help-text">${formatDateTime(p.created_at)}</span>
       </div>
       <p style="margin:0; font-size:14.5px; line-height:1.6; white-space: pre-wrap;">${escapeHtml(p.body)}</p>
