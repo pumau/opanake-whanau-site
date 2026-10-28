@@ -168,6 +168,8 @@ async function loadTopic() {
     if (!postsError) break;
   }
   currentPosts = posts || [];
+  // Opening a topic marks it as read (database update #29; quietly does nothing before that).
+  sb.rpc('mark_topic_read', { tid: topicId }).then(() => {}, () => {});
   filesOn = await forumFilesReady();
   if (filesOn) {
     document.getElementById('reply-file').setAttribute('accept', FORUM_FILE_ACCEPT);

@@ -141,6 +141,8 @@ let nameById = {};
 let categories = [];
 let topics = [];
 let postCounts = {};
+let unreadByTopic = {};     // new posts per topic, once database update #29 has been run
+let unreadOn = false;
 let postText = {};
 let myBranchId = null;      // this person's branch, if they have one
 let myBranchName = '';
@@ -149,12 +151,14 @@ let filesOn = false;        // true once database update #18 has been run
 
 function topicCardHtml(t, showCategory) {
   const n = postCounts[t.id] || 1;
+  const unread = unreadByTopic[t.id] || 0;
+  const latest = t.activity && formatDate(t.activity) !== formatDate(t.created_at) ? formatDate(t.activity) : '';
   const cat = showCategory ? categories.find((c) => c.id === t.category_id) : null;
   return `
             <a href="topic.html?id=${encodeURIComponent(t.id)}" class="topic-card"${t.hidden ? ' style="border-style: dashed; opacity: 0.65;"' : ''}>
-              <div class="topic-card-title">${escapeHtml(t.title)}</div>
+              <div class="topic-card-title">${escapeHtml(t.title)}${unread ? ` <span class="badge" style="background: var(--accent); color: #fff; margin-left: 6px; white-space: nowrap;">${unread} new</span>` : ''}</div>
               <div class="help-text">${escapeHtml(nameById[t.author_id] || 'A whānau member')} · ${formatDate(t.created_at)}</div>
-              <div class="topic-card-foot">${n} post${n === 1 ? '' : 's'}${cat ? ' · ' + escapeHtml(cat.name) : ''}${t.hidden ? ' · <span style="color:#B3492A;">Hidden from members</span>' : ''}</div>
+              <div class="topic-card-foot">${n} post${n === 1 ? '' : 's'}${latest ? ' · latest ' + latest : ''}${cat ? ' · ' + escapeHtml(cat.name) : ''}${t.hidden ? ' · <span style="color:#B3492A;">Hidden from members</span>' : ''}</div>
             </a>`;
 }
 
@@ -212,8 +216,50 @@ function renderForum() {
         </section>`;
     }).join('');
 
-  container.innerHTML = (branchHtml + html) || '<p class="help-text">No topics match that search.</p>';
+  let newBanner = '';
+  if (unreadOn) {
+    let total = 0;
+    let inTopics = 0;
+    topics.forEach((t) => {
+      const u = t.hidden ? 0 : (unreadByTopic[t.id] || 0);
+      if (u > 0) { total += u; inTopics += 1; }
+    });
+    newBanner = total > 0
+      ? `<div class="card" style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+          <div><strong>${total} new post${total === 1 ? '' : 's'}</strong> <span class="help-text">in ${inTopics} topic${inTopics === 1 ? '' : 's'} since you last looked</span></div>
+          <button type="button" class="btn btn-outline" id="mark-all-read">Mark all as read</button>
+        </div>`
+      : '<p class="help-text" style="margin: 0;">You are all caught up. No new posts.</p>';
+  }
+
+  container.innerHTML = (newBanner + branchHtml + html) || '<p class="help-text">No topics match that search.</p>';
 }
+
+// How many new posts there are. Needs database update #29; until then the
+// page just doesn't show the counts.
+async function loadUnread() {
+  const { data, error } = await sb.rpc('my_forum_unread');
+  unreadOn = !error;
+  unreadByTopic = {};
+  if (!error) (data || []).forEach((u) => { unreadByTopic[u.topic_id] = u.unread; });
+}
+
+document.getElementById('categories').addEventListener('click', async (e) => {
+  const btn = e.target.closest('#mark-all-read');
+  if (!btn) return;
+  btn.disabled = true;
+  const { error } = await sb.rpc('mark_all_forum_read');
+  if (error) { btn.disabled = false; alert("Couldn't do that just now. Please try again."); return; }
+  await loadUnread();
+  renderForum();
+});
+
+// Coming back with the Back button: refresh the counts, since topics were read meanwhile.
+window.addEventListener('pageshow', async (e) => {
+  if (!e.persisted || !topics.length) return;
+  await loadUnread();
+  renderForum();
+});
 
 async function loadForum() {
   const { data: directory } = await sb.rpc('list_member_directory');
@@ -246,9 +292,9 @@ async function loadForum() {
 
   let { data: allPosts, error: postsErr } = await sb
     .from('forum_posts')
-    .select('topic_id, body, hidden');
+    .select('topic_id, body, hidden, created_at');
   if (postsErr) {
-    ({ data: allPosts } = await sb.from('forum_posts').select('topic_id, body'));
+    ({ data: allPosts } = await sb.from('forum_posts').select('topic_id, body, created_at'));
   }
 
   if (catError || !cats) {
@@ -260,11 +306,19 @@ async function loadForum() {
   topics = topicRows || [];
   postCounts = {};
   postText = {};
+  const lastPostAt = {};
   (allPosts || []).forEach((p) => {
     if (p.hidden) return; // admins can see hidden posts, but they don't count
     postCounts[p.topic_id] = (postCounts[p.topic_id] || 0) + 1;
     postText[p.topic_id] = (postText[p.topic_id] || '') + ' ' + (p.body || '').toLowerCase();
+    if (p.created_at && (!lastPostAt[p.topic_id] || new Date(p.created_at) > new Date(lastPostAt[p.topic_id]))) lastPostAt[p.topic_id] = p.created_at;
   });
+
+  // Latest activity first: a topic moves to the top when it gets a new reply.
+  topics.forEach((t) => { t.activity = lastPostAt[t.id] || t.created_at; });
+  topics.sort((a, b) => new Date(b.activity) - new Date(a.activity));
+
+  await loadUnread();
 
   const options = categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
   document.getElementById('nt-category').innerHTML = options;
