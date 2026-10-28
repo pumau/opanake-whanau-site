@@ -65,6 +65,8 @@
 </div>
 <a id="doc-link-btn" href="archive.html" class="btn btn-outline">View document</a>
 </div>
+<div id="original-post" style="margin-top: 20px;"></div>
+
 <form id="reply-form" class="card" style="margin-top: 20px;">
 <h2 style="font-size: 16px; margin: 0 0 14px;">Reply</h2>
 <div class="field">
@@ -80,7 +82,7 @@
 <button type="submit" id="reply-submit" class="btn">Post reply</button>
 </form>
 
-<p class="help-text" style="margin: 22px 0 0;">Newest posts first.</p>
+<h2 id="replies-heading" style="font-size: 16px; margin: 28px 0 0;"></h2>
 <div id="post-list" style="display: flex; flex-direction: column; gap: 16px; margin-top: 12px;"></div>
 
 </div>
@@ -188,11 +190,12 @@ async function loadTopic() {
 
   document.getElementById('topic-title').textContent = topic.title;
   await showBranchNote(topic);
-  const firstPostId = (posts && posts.length) ? posts[0].id : null;  // the oldest post is the topic's opening post
-  document.getElementById('post-list').innerHTML = (posts || []).slice().reverse().map((p) => `
-    <div class="card"${p.hidden ? ' style="border-style: dashed; opacity: 0.65;"' : ''}>
+  // The oldest post is the topic's opening post: it stays on top in its own
+  // colour. Replies sit below it, newest first.
+  const postCard = (p, isOriginal) => `
+    <div class="card"${isOriginal ? ' style="background: var(--river-soft); border: 1px solid var(--river); border-left: 5px solid var(--river);"' : (p.hidden ? ' style="border-style: dashed; opacity: 0.65;"' : '')}${isOriginal && p.hidden ? ' data-hidden-original="1"' : ''}>
       <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:8px;">
-        <span style="font-weight:600; font-size:13.5px;">${escapeHtml(nameById[p.author_id] || 'A whānau member')}${p.id === firstPostId && posts.length > 1 ? ' <span class="badge badge-pending" style="margin-left:6px; background: var(--river-soft); color: var(--river);">Original post</span>' : ''}${p.hidden ? ' <span class="badge badge-pending" style="margin-left:6px;">Hidden from members</span>' : ''}</span>
+        <span style="font-weight:600; font-size:13.5px;">${escapeHtml(nameById[p.author_id] || 'A whānau member')}${isOriginal ? ' <span class="badge" style="margin-left:6px; background: var(--river); color: #fff;">Start of this topic</span>' : ''}${p.hidden ? ' <span class="badge badge-pending" style="margin-left:6px;">Hidden from members</span>' : ''}</span>
         <span class="help-text">${formatDateTime(p.created_at)}</span>
       </div>
       <p style="margin:0; font-size:14.5px; line-height:1.6; white-space: pre-wrap;">${escapeHtml(p.body)}</p>
@@ -206,7 +209,16 @@ async function loadTopic() {
         <button type="button" class="btn btn-outline" data-mod="${p.hidden ? 'unhide-post' : 'hide-post'}" data-id="${p.id}" style="padding:4px 12px; font-size:12.5px;">${p.hidden ? 'Unhide' : 'Hide'}</button>
         <button type="button" class="btn btn-outline" data-mod="delete-post" data-id="${p.id}" style="padding:4px 12px; font-size:12.5px; color:#B3492A;">Delete</button>
       </div>` : ''}
-    </div>`).join('');
+    </div>`;
+
+  const allPosts = posts || [];
+  const original = allPosts[0] || null;
+  const replies = allPosts.slice(1).reverse();
+  document.getElementById('original-post').innerHTML = original ? postCard(original, true) : '';
+  document.getElementById('replies-heading').textContent = replies.length
+    ? (replies.length === 1 ? '1 reply, newest first' : replies.length + ' replies, newest first')
+    : 'No replies yet';
+  document.getElementById('post-list').innerHTML = replies.map((p) => postCard(p, false)).join('');
   renderTopicAdmin();
 
   await showDocumentLink(topic);
