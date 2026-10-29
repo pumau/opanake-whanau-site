@@ -478,3 +478,13 @@ main{ flex: 1; width: 100%; }
   .mlc-feature{ padding: 24px 20px; }
   .path-feature{ padding: 20px 18px 18px; border-left-width: 6px; }
 }
+
+/* "Copy link" buttons beside links to documents on other websites */
+.doc-link{ display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+.copy-link-btn{ font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); background: none; border: 1px dashed var(--border); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.copy-link-btn:hover{ background: var(--surface-2, #F1EDE5); color: var(--accent-dark); }
+.copy-link-btn.copied{ background: var(--accent); border: 1px solid var(--accent); color: #fff; }
+.copy-link-field{ font: inherit; font-size: 12.5px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); min-width: 220px; flex: 1 1 100%; }
+.doc-link-card{ display: flex; flex-direction: column; gap: 8px; }
+.doc-link-card .link-card{ flex: 1; }
+.doc-link-card .copy-link-btn{ align-self: flex-start; }
