@@ -457,3 +457,24 @@ main{ flex: 1; width: 100%; }
   .svc-grid{ grid-template-columns: 1fr; }
 }
 .svc-form .error-text{ margin: 0 0 12px; }
+
+/* Feature panel at the top of the Māori Land Court page, and the highlighted owners' meeting section */
+.mlc-feature{ background: var(--accent-dark); color: #F3EFE6; border-radius: 18px; padding: 30px 32px; margin: 0 0 32px; display: flex; gap: 24px 36px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.mlc-feature-text{ flex: 1 1 380px; min-width: 0; }
+.mlc-feature .eyebrow{ color: var(--accent-2); }
+.mlc-feature h2{ color: #fff; font-size: 28px; margin: 6px 0 10px; }
+.mlc-feature p{ margin: 0; max-width: 62ch; line-height: 1.65; color: #E8E4DA; font-size: 15.5px; }
+.mlc-feature-actions{ display: flex; flex-direction: column; gap: 14px; align-items: flex-start; }
+.btn-feature{ background: var(--accent-2); color: #2A2420; font-size: 15px; padding: 14px 26px; }
+.btn-feature:hover{ background: #E49C4E; }
+.mlc-feature-link{ color: #F3EFE6; text-decoration: underline; text-underline-offset: 3px; font-weight: 600; font-size: 14.5px; }
+.path-feature{ background: var(--river-soft); border: 1px solid var(--river); border-left: 8px solid var(--accent-2); border-radius: 16px; padding: 24px 28px 22px; margin: 6px 0 28px; scroll-margin-top: 16px; }
+.path-feature .eyebrow{ color: var(--river); }
+.path-step .path-feature h3{ font-size: 24px; margin: 4px 0 12px; }
+.path-feature h4{ font-family: 'Fraunces', serif; font-size: 16px; color: var(--accent-dark); margin: 20px 0 6px; }
+.path-feature .path-list{ margin-top: 6px; }
+.path-feature .path-links{ margin-top: 16px; }
+@media (max-width: 560px){
+  .mlc-feature{ padding: 24px 20px; }
+  .path-feature{ padding: 20px 18px 18px; border-left-width: 6px; }
+}
