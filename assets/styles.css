@@ -498,7 +498,3 @@ main{ flex: 1; width: 100%; }
 .privacy-note h2{ font-size: 15px; margin: 0 0 6px; }
 .privacy-note p{ margin: 0 0 8px; }
 .privacy-note p:last-child{ margin-bottom: 0; }
-
-/* Contact line at the bottom of every page */
-.footer-note{ flex: 0 0 100%; margin: 0; font-size: 13px; line-height: 1.5; color: #E3EFDD; }
-.footer-note a{ color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
