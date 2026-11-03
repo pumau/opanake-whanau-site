@@ -488,3 +488,13 @@ main{ flex: 1; width: 100%; }
 .doc-link-card{ display: flex; flex-direction: column; gap: 8px; }
 .doc-link-card .link-card{ flex: 1; }
 .doc-link-card .copy-link-btn{ align-self: flex-start; }
+
+/* Contact link in the footer (same look as the Facebook pill) */
+.footer-contact{ display: inline-flex; align-items: center; width: fit-content; margin: 0; padding: 8px 16px; border: 1px solid rgba(227,239,221,0.45); border-radius: 999px; color: #E3EFDD; font-weight: 600; font-size: 13px; }
+.footer-contact:hover{ background: rgba(255,255,255,0.12); }
+
+/* Privacy notice on the Register page */
+.privacy-note{ background: var(--river-soft); border: 1px solid var(--river); border-radius: 10px; padding: 14px 16px; font-size: 13.5px; margin: 4px 0 16px; }
+.privacy-note h2{ font-size: 15px; margin: 0 0 6px; }
+.privacy-note p{ margin: 0 0 8px; }
+.privacy-note p:last-child{ margin-bottom: 0; }
