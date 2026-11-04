@@ -53,7 +53,7 @@
 <select id="ph-branch-filter"><option value="">All branches</option></select>
 <input id="ph-search" type="text" placeholder="Search who's in it…">
 </div>
-<div id="gallery" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
+<div id="gallery" class="gallery-flow">
 <div class="help-text">Loading photos…</div>
 </div>
 </div>
@@ -140,7 +140,7 @@ function renderGallery() {
   gallery.innerHTML = photos.map((p) => {
     const url = urlByPhotoId[p.id] || '';
     const image = url
-      ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><img src="${escapeHtml(url)}" alt="${escapeHtml(p.person_name)}" style="width:100%; height:170px; object-fit:cover; display:block;"></a>`
+      ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" title="Open the full-size photo"><img class="gallery-img" src="${escapeHtml(url)}" alt="${escapeHtml(p.person_name)}"></a>`
       : '<div style="height:170px; background: var(--surface-2);"></div>';
 
     let body;
@@ -172,7 +172,7 @@ function renderGallery() {
     }
 
     return `
-      <div class="card" style="padding: 0; overflow: hidden;">
+      <div class="card gallery-card" style="padding: 0; overflow: hidden;">
         ${image}
         <div style="padding: 14px;">${body}</div>
       </div>`;

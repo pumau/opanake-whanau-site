@@ -513,3 +513,8 @@ main{ flex: 1; width: 100%; }
 .succ-no{ background: #F4EBC4; color: #5E4E0A; }
 .succ-descendant{ background: #DDEED8; color: #2B5A2F; }
 .succ-not_sure{ background: #E6E3DB; color: #5C574D; }
+
+/* Photos page: every photo shown whole, in its own shape, in tidy columns */
+.gallery-flow{ column-width: 220px; column-gap: 16px; }
+.gallery-card{ display: inline-block; width: 100%; margin: 0 0 16px; break-inside: avoid; }
+.gallery-img{ display: block; width: 100%; height: auto; min-height: 120px; background: var(--surface-2); }
