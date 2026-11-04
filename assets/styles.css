@@ -510,6 +510,6 @@ main{ flex: 1; width: 100%; }
 .succ-yes{ background: #D9EEEC; color: #14585E; }
 .succ-vested{ background: #DCE8F4; color: #1F4A73; }
 .succ-trust{ background: #E7E1F2; color: #4A3A78; }
-.succ-no{ background: #ECEFD3; color: #505A17; }
-.succ-descendant{ background: #F5DFDA; color: #7A372E; }
+.succ-no{ background: #F4EBC4; color: #5E4E0A; }
+.succ-descendant{ background: #DDEED8; color: #2B5A2F; }
 .succ-not_sure{ background: #E6E3DB; color: #5C574D; }
