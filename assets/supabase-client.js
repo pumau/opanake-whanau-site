@@ -158,9 +158,7 @@ const SUCCESSION_ORDER = ['yes', 'vested', 'trust', 'no', 'descendant', 'not_sur
 function successionBadge(value) {
   const label = SUCCESSION_LABELS[value];
   if (!label) return '';
-  const style = value === 'yes' ? 'badge badge-approved' : 'badge';
-  const extra = value === 'yes' ? '' : ' style="background: var(--surface-2); color: var(--ink-soft);"';
-  return `<span class="${style}"${extra} title="${SUCCESSION_HELP[value].replace(/"/g, '&quot;')}">${label}</span>`;
+  return `<span class="badge succ-${value}" title="${SUCCESSION_HELP[value].replace(/"/g, '&quot;')}">${label}</span>`;
 }
 
 function branchYear(name) {

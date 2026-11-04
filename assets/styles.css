@@ -505,3 +505,11 @@ main{ flex: 1; width: 100%; }
 .succession-guide dt{ display: inline; font-weight: 700; color: var(--ink); }
 .succession-guide dt::after{ content: ":"; }
 .succession-guide dd{ display: inline; margin: 0; }
+
+/* Succession answers: one soft colour each (all pass contrast on their tint) */
+.succ-yes{ background: #D9EEEC; color: #14585E; }
+.succ-vested{ background: #DCE8F4; color: #1F4A73; }
+.succ-trust{ background: #E7E1F2; color: #4A3A78; }
+.succ-no{ background: #ECEFD3; color: #505A17; }
+.succ-descendant{ background: #F5DFDA; color: #7A372E; }
+.succ-not_sure{ background: #E6E3DB; color: #5C574D; }
