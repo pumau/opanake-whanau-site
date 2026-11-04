@@ -97,7 +97,7 @@
 
 <div id="admin-members" class="hidden" style="margin-top: 32px;">
 <h2 style="font-size: 19px;">All members</h2>
-<p class="help-text" style="margin-top: 4px;">Set or change anyone's branch here — including anyone who signed up as "not sure". You can also set whether someone has succeeded, which shows on their card for all approved members.</p>
+<p class="help-text" style="margin-top: 4px;">Set or change anyone's branch here — including anyone who signed up as "not sure". You can also set their succession status, which shows on their card for all approved members.</p>
 <div id="members-list" style="display: flex; flex-direction: column; gap: 12px; margin-top: 14px;">
 <div class="help-text">Loading…</div>
 </div>
@@ -171,7 +171,7 @@ async function loadProfile() {
   if (profile.status === 'approved') { loadEmailPreference(session.user.id); loadInvite(); }
 
   document.getElementById('p-note').textContent = profile.status === 'approved'
-    ? 'You have full access to the members’ area as it comes online.' + (profile.succession_status ? ' Other approved members can see whether you have succeeded on your card. To change that answer, ask an admin.' : '')
+    ? 'You have full access to the members’ area as it comes online.' + (profile.succession_status ? ' Other approved members can see your succession status on your card. To change it, ask an admin.' : '')
     : 'An admin needs to approve your account before you get full access to the members’ area — hang tight.';
 }
 
@@ -394,8 +394,11 @@ async function renderMembers() {
         ${hasSuccession ? `<select data-member-succession="${m.id}" aria-label="Succession status for ${escapeHtml(m.full_name || 'this member')}" style="font:inherit; font-size:13px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg);">
           <option value="">Succession: not recorded</option>
           <option value="yes">Succeeded</option>
+          <option value="vested">Vested</option>
+          <option value="trust">Held in trust</option>
           <option value="no">Not yet succeeded</option>
-          <option value="not_sure">Succession: not sure</option>
+          <option value="descendant">Descendant</option>
+          <option value="not_sure">Unsure</option>
         </select>` : ''}
         <select data-member-branch="${m.id}" style="font:inherit; font-size:13px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg);">${branchOptions}</select>
       </div>

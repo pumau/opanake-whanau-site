@@ -139,7 +139,7 @@ function renderDirectory() {
   });
 
   document.getElementById('directory-count').textContent =
-    `Showing ${members.length} of ${allMembers.length} registered whānau. Only your name, branch, join date and whether you have succeeded are visible to others. Nothing else from your profile is shared here.`;
+    `Showing ${members.length} of ${allMembers.length} registered whānau. Only your name, branch, join date and succession status are visible to others. Nothing else from your profile is shared here.`;
 
   grid.innerHTML = members
     .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))
