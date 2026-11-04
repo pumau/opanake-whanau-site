@@ -145,12 +145,22 @@ function safeFileName(name) {
 // any without a year in the name keep their usual order after the dated ones.
 // Succession status badge (shown on member cards). Empty when not recorded.
 const SUCCESSION_LABELS = { yes: 'Succeeded', vested: 'Vested', trust: 'Held in trust', no: 'Not yet succeeded', descendant: 'Descendant', not_sure: 'Unsure' };
+// What each answer means, in plain words. Shown on Register and as the hover text on cards.
+const SUCCESSION_HELP = {
+  yes: 'A succession order is in my name.',
+  vested: 'A share was gifted or transferred to me by the court.',
+  trust: 'A share is held in a trust for me, or by me as trustee.',
+  no: "There's a share I can succeed to, and I haven't yet.",
+  descendant: "I descend from an owner but don't have a share of my own.",
+  not_sure: "That's okay, an admin can help you work it out."
+};
+const SUCCESSION_ORDER = ['yes', 'vested', 'trust', 'no', 'descendant', 'not_sure'];
 function successionBadge(value) {
   const label = SUCCESSION_LABELS[value];
   if (!label) return '';
   const style = value === 'yes' ? 'badge badge-approved' : 'badge';
   const extra = value === 'yes' ? '' : ' style="background: var(--surface-2); color: var(--ink-soft);"';
-  return `<span class="${style}"${extra} title="Succession status">${label}</span>`;
+  return `<span class="${style}"${extra} title="${SUCCESSION_HELP[value].replace(/"/g, '&quot;')}">${label}</span>`;
 }
 
 function branchYear(name) {

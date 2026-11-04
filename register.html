@@ -68,8 +68,9 @@
 <span class="help-text">Not sure? Choose "Not sure / help me work it out" and an admin will help sort it at approval time.</span>
 </div>
 <div class="field">
-<label for="su-succession">Where are you with succession?</label>
-<select id="su-succession" required aria-describedby="su-succession-detail su-succession-help">
+<label for="su-succession">Where are you at with succession?</label>
+<dl class="succession-guide" id="su-succession-guide"></dl>
+<select id="su-succession" required aria-describedby="su-succession-guide su-succession-help">
 <option value="" disabled selected>Choose one…</option>
 <option value="yes">Succeeded</option>
 <option value="vested">Vested</option>
@@ -78,7 +79,6 @@
 <option value="descendant">Descendant</option>
 <option value="not_sure">Unsure</option>
 </select>
-<span class="help-text" id="su-succession-detail" style="display:block; color: var(--accent-dark); font-weight: 600; min-height: 1.2em;"></span>
 <span class="help-text" id="su-succession-help">Succession is the court step that puts you on the record as an owner. Pick what fits best. Other approved members can see your answer on your card, and an admin can update it later.</span>
 </div>
 <div class="privacy-note" id="privacy-note">
@@ -209,17 +209,9 @@ async function loadBranches() {
   }
 }
 
-const SUCCESSION_HELP = {
-  yes: 'A succession order is in my name.',
-  vested: 'A share was gifted or transferred to me by the court.',
-  trust: 'A share is held in a trust for me, or by me as trustee.',
-  no: "There's a share I can succeed to, and I haven't yet.",
-  descendant: "I descend from an owner but don't have a share of my own.",
-  not_sure: "That's okay, an admin can help you work it out."
-};
-document.getElementById('su-succession').addEventListener('change', (e) => {
-  document.getElementById('su-succession-detail').textContent = SUCCESSION_HELP[e.target.value] || '';
-});
+// The meaning of each answer sits in assets/supabase-client.js (SUCCESSION_HELP), so it is written once.
+document.getElementById('su-succession-guide').innerHTML = SUCCESSION_ORDER.map((v) =>
+  '<div><dt>' + SUCCESSION_LABELS[v] + '</dt> <dd>' + SUCCESSION_HELP[v] + '</dd></div>').join('');
 
 signupForm.addEventListener('submit', async (e) => {
   e.preventDefault();

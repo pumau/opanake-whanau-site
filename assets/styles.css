@@ -498,3 +498,10 @@ main{ flex: 1; width: 100%; }
 .privacy-note h2{ font-size: 15px; margin: 0 0 6px; }
 .privacy-note p{ margin: 0 0 8px; }
 .privacy-note p:last-child{ margin-bottom: 0; }
+
+/* What each succession answer means, shown under the question on Register */
+.succession-guide{ margin: 2px 0 10px; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
+.succession-guide div{ margin: 0 0 3px; }
+.succession-guide dt{ display: inline; font-weight: 700; color: var(--ink); }
+.succession-guide dt::after{ content: ":"; }
+.succession-guide dd{ display: inline; margin: 0; }
