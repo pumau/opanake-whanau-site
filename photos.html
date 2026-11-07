@@ -50,7 +50,7 @@
 
 <div class="col-main">
 <div class="filter-bar">
-<select id="ph-branch-filter"><option value="">All branches</option></select>
+<select id="ph-branch-filter"><option value="">All photos</option></select>
 <input id="ph-search" type="text" placeholder="Search who's in it…">
 </div>
 <div id="gallery" class="gallery-flow">
@@ -70,7 +70,7 @@
 <input id="ph-person" type="text" required placeholder="e.g. Nan and the cousins, 1998">
 </div>
 <div class="field">
-<label for="ph-branch">Branch</label>
+<label for="ph-branch">Branch or whenua</label>
 <select id="ph-branch" required></select>
 </div>
 <div class="field">
@@ -151,7 +151,7 @@ function renderGallery() {
           <input type="text" data-edit="person" value="${escapeHtml(p.person_name)}">
         </div>
         <div class="field" style="margin-bottom:10px;">
-          <label>Branch</label>
+          <label>Branch or whenua</label>
           <select data-edit="branch">${branchOptionsHtml(p.branch_id)}</select>
         </div>
         <div class="field" style="margin-bottom:10px;">
@@ -212,7 +212,7 @@ async function init() {
 
   const options = (branches || []).map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
   document.getElementById('ph-branch').innerHTML = options;
-  document.getElementById('ph-branch-filter').innerHTML = '<option value="">All branches</option>' + options;
+  document.getElementById('ph-branch-filter').innerHTML = '<option value="">All photos</option>' + options;
 
   document.getElementById('ph-branch-filter').addEventListener('change', renderGallery);
   document.getElementById('ph-search').addEventListener('input', renderGallery);
@@ -276,7 +276,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
   const caption = document.getElementById('ph-caption').value.trim();
 
   if (!file || !personName || !branchId) {
-    errorEl.textContent = 'Add a photo, who\'s in it, and a branch.';
+    errorEl.textContent = 'Add a photo, who\'s in it, and a branch or whenua.';
     errorEl.classList.remove('hidden');
     return;
   }
