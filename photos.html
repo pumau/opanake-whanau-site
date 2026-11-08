@@ -112,6 +112,130 @@ let urlByPhotoId = {};
 let isAdmin = false;
 let editingId = null;
 
+// Hearts and comments (database update #34). If it hasn't been run, none of this shows.
+let activityOn = false;
+let activity = {};          // photo id -> { hearts, hearted_by: [ids], comments }
+let nameById = {};
+let myId = null;
+let openComments = new Set();
+let commentsByPhoto = {};   // photo id -> [comments]
+let editingCommentId = null;
+let busyHeart = {};
+
+function memberName(id) { return nameById[id] || 'A member'; }
+
+function heartNames(pid) {
+  const a = activity[pid];
+  if (!a || !a.hearts) return '';
+  const ids = a.hearted_by || [];
+  const mine = ids.includes(myId);
+  const others = ids.filter((i) => i !== myId).map(memberName);
+  const names = (mine ? ['You'] : []).concat(others);
+  const unlisted = Math.max(a.hearts - names.length, 0);
+  const shown = names.slice(0, 3);
+  const more = names.length - shown.length + unlisted;
+  if (more > 0) {
+    return shown.join(', ') + ' and ' + more + (more === 1 ? ' other' : ' others');
+  }
+  return shown.length > 1 ? shown.slice(0, -1).join(', ') + ' and ' + shown[shown.length - 1] : shown[0];
+}
+
+function actionsHtml(pid) {
+  const a = activity[pid] || { hearts: 0, hearted_by: [], comments: 0 };
+  const mine = (a.hearted_by || []).includes(myId);
+  const names = heartNames(pid);
+  const allNames = (a.hearted_by || []).map((i) => i === myId ? 'You' : memberName(i)).join(', ');
+  const heartIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 2.7 5 6 5c2 0 3.4 1.1 4.2 2.4h.1C11.1 6.1 12.5 5 14.5 5c3.3 0 5.1 3.400 3.600 6.800C19.500 16.400 12 21 12 21z" stroke-linejoin="round"/></svg>';
+  const commentLabel = a.comments ? 'Comments (' + a.comments + ')' : 'Add a comment';
+  return `
+    <button type="button" class="heart-btn${mine ? ' on' : ''}" data-ph="heart" data-id="${pid}" aria-pressed="${mine}" aria-label="${mine ? 'Remove your heart from this photo' : 'Heart this photo'}">${heartIcon}<span>${a.hearts || 0}</span></button>
+    <button type="button" class="comments-toggle" data-ph="toggle-comments" data-id="${pid}" aria-expanded="${openComments.has(pid)}">${commentLabel}</button>
+    ${names ? `<div class="heart-names" title="${escapeHtml(allNames)}">${escapeHtml(names)}</div>` : ''}`;
+}
+
+function fmtWhen(iso) {
+  try {
+    return new Date(iso).toLocaleString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  } catch (e) { return ''; }
+}
+
+function commentsHtml(pid) {
+  const list = commentsByPhoto[pid];
+  if (!list) return '<div class="help-text">Loading comments…</div>';
+  const items = list.map((c) => {
+    const mine = c.author_id === myId;
+    if (editingCommentId === c.id) {
+      return `<div class="comment">
+        <textarea data-edit-comment="${c.id}" maxlength="1000" rows="3" aria-label="Edit your comment">${escapeHtml(c.body)}</textarea>
+        <div class="comment-actions">
+          <button type="button" class="btn" style="padding:6px 14px; font-size:13px;" data-ph="save-comment" data-id="${pid}" data-cid="${c.id}">Save</button>
+          <button type="button" class="btn btn-outline" style="padding:6px 14px; font-size:13px;" data-ph="cancel-comment" data-id="${pid}">Cancel</button>
+        </div></div>`;
+    }
+    const links = (mine ? `<button type="button" class="comment-link" data-ph="edit-comment" data-id="${pid}" data-cid="${c.id}">Edit</button>` : '') +
+      ((mine || isAdmin) ? `<button type="button" class="comment-link" data-ph="delete-comment" data-id="${pid}" data-cid="${c.id}">Delete</button>` : '');
+    return `<div class="comment">
+      <div class="comment-meta"><strong>${escapeHtml(mine ? 'You' : memberName(c.author_id))}</strong> · ${escapeHtml(fmtWhen(c.created_at))}${c.edited_at ? ' · edited' : ''}</div>
+      <div class="comment-body">${escapeHtml(c.body)}</div>
+      ${links ? `<div class="comment-actions">${links}</div>` : ''}
+    </div>`;
+  }).join('');
+  return `${items || '<div class="help-text" style="margin-bottom:6px;">No comments yet. Be the first.</div>'}
+    <div class="comment-form">
+      <textarea data-new-comment="${pid}" maxlength="1000" rows="2" placeholder="Write a comment…" aria-label="Write a comment"></textarea>
+      <div class="error-text hidden" data-comment-error="${pid}"></div>
+      <button type="button" class="btn" style="padding:6px 14px; font-size:13px;" data-ph="post-comment" data-id="${pid}">Post</button>
+    </div>`;
+}
+
+function activityHtml(pid) {
+  if (!activityOn) return '';
+  const open = openComments.has(pid);
+  return `<div class="photo-activity" data-photo="${pid}">
+    <div class="photo-actions" data-actions="${pid}">${actionsHtml(pid)}</div>
+    <div class="photo-comments${open ? '' : ' hidden'}" data-comments="${pid}">${open ? commentsHtml(pid) : ''}</div>
+  </div>`;
+}
+
+function refreshActions(pid) {
+  const el = document.querySelector(`[data-actions="${pid}"]`);
+  if (el) el.innerHTML = actionsHtml(pid);
+}
+function refreshComments(pid) {
+  const el = document.querySelector(`[data-comments="${pid}"]`);
+  if (!el) return;
+  const open = openComments.has(pid);
+  el.classList.toggle('hidden', !open);
+  el.innerHTML = open ? commentsHtml(pid) : '';
+}
+
+async function loadNames() {
+  const { data } = await sb.rpc('list_member_directory');
+  if (data) data.forEach((m) => { nameById[m.id] = m.full_name; });
+}
+
+async function loadActivity() {
+  const { data, error } = await sb.rpc('photo_activity');
+  if (error || !data) { activityOn = false; return; }
+  activityOn = true;
+  activity = {};
+  data.forEach((r) => { activity[r.photo_id] = { hearts: r.hearts, hearted_by: r.hearted_by || [], comments: r.comments }; });
+}
+
+async function loadComments(pid) {
+  const { data } = await sb.rpc('list_photo_comments', { pid });
+  commentsByPhoto[pid] = data || [];
+  if (!activity[pid]) activity[pid] = { hearts: 0, hearted_by: [], comments: 0 };
+  activity[pid].comments = commentsByPhoto[pid].length;
+}
+
+function commentErrorWords(code) {
+  if (code === 'empty') return 'Write something first.';
+  if (code === 'too_long') return 'That is a bit long. Please keep it under 1,000 characters.';
+  if (code === 'limit') return "You've posted a lot of comments in the last hour. Please try again a little later.";
+  return "Couldn't save that comment.";
+}
+
 function branchOptionsHtml(selectedId) {
   return Object.keys(branchNameById).map((id) =>
     `<option value="${id}"${id === selectedId ? ' selected' : ''}>${escapeHtml(branchNameById[id])}</option>`).join('');
@@ -174,7 +298,7 @@ function renderGallery() {
     return `
       <div class="card gallery-card" style="padding: 0; overflow: hidden;">
         ${image}
-        <div style="padding: 14px;">${body}</div>
+        <div style="padding: 14px;">${body}${(isAdmin && editingId === p.id) ? '' : activityHtml(p.id)}</div>
       </div>`;
   }).join('');
 }
@@ -196,6 +320,7 @@ async function loadGallery() {
     const { data: signed } = await sb.storage.from('photos').createSignedUrl(p.storage_path, 3600);
     if (signed) urlByPhotoId[p.id] = signed.signedUrl;
   }));
+  await loadActivity();
   renderGallery();
 }
 
@@ -260,8 +385,83 @@ async function init() {
     }
   });
 
+  myId = session && session.user ? session.user.id : null;
+  await loadNames();
   await loadGallery();
 }
+
+document.getElementById('gallery').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-ph]');
+  if (!btn) return;
+  const act = btn.getAttribute('data-ph');
+  const pid = btn.getAttribute('data-id');
+  const cid = btn.getAttribute('data-cid');
+
+  if (act === 'heart') {
+    if (busyHeart[pid]) return;
+    busyHeart[pid] = true;
+    btn.disabled = true;
+    await sb.rpc('toggle_photo_heart', { pid });
+    busyHeart[pid] = false;
+    await loadActivity();
+    refreshActions(pid);
+    return;
+  }
+
+  if (act === 'toggle-comments') {
+    if (openComments.has(pid)) { openComments.delete(pid); editingCommentId = null; refreshComments(pid); refreshActions(pid); return; }
+    openComments.add(pid);
+    refreshComments(pid);
+    refreshActions(pid);
+    await loadComments(pid);
+    refreshComments(pid);
+    refreshActions(pid);
+    return;
+  }
+
+  if (act === 'post-comment') {
+    const box = document.querySelector(`[data-new-comment="${pid}"]`);
+    const errEl = document.querySelector(`[data-comment-error="${pid}"]`);
+    errEl.classList.add('hidden');
+    btn.disabled = true;
+    const { data, error } = await sb.rpc('add_photo_comment', { pid, comment_text: box.value });
+    btn.disabled = false;
+    if (error || data !== 'ok') {
+      errEl.textContent = commentErrorWords(error ? 'x' : data);
+      errEl.classList.remove('hidden');
+      return;
+    }
+    await loadComments(pid);
+    refreshComments(pid);
+    refreshActions(pid);
+    return;
+  }
+
+  if (act === 'edit-comment') { editingCommentId = cid; refreshComments(pid); return; }
+  if (act === 'cancel-comment') { editingCommentId = null; refreshComments(pid); return; }
+
+  if (act === 'save-comment') {
+    const box = document.querySelector(`[data-edit-comment="${cid}"]`);
+    btn.disabled = true;
+    const { data, error } = await sb.rpc('edit_photo_comment', { cid, comment_text: box.value });
+    btn.disabled = false;
+    if (error || data !== 'ok') { alert(commentErrorWords(error ? 'x' : data)); return; }
+    editingCommentId = null;
+    await loadComments(pid);
+    refreshComments(pid);
+    return;
+  }
+
+  if (act === 'delete-comment') {
+    if (!confirm('Delete this comment?')) return;
+    btn.disabled = true;
+    const { error } = await sb.rpc('delete_photo_comment', { cid });
+    if (error) { btn.disabled = false; alert("Couldn't delete that comment."); return; }
+    await loadComments(pid);
+    refreshComments(pid);
+    refreshActions(pid);
+  }
+});
 
 document.getElementById('upload-form').addEventListener('submit', async (e) => {
   e.preventDefault();
