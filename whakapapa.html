@@ -89,6 +89,8 @@
 </div>
 </div>
 
+<div id="succession-summary" class="succession-summary" aria-live="polite"></div>
+
 <div id="directory-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px;"></div>
 <p id="directory-count" class="help-text" style="margin-top: 14px; text-align: center;"></p>
 </div>
@@ -137,6 +139,20 @@ function renderDirectory() {
     if (search && !(m.full_name || '').toLowerCase().includes(search)) return false;
     return true;
   });
+
+  // Small succession tally. Follows the branch filter (not the search box).
+  const inScope = allMembers.filter((m) => !branchFilter || m.branch_id === branchFilter);
+  const tally = {};
+  let recorded = 0;
+  inScope.forEach((m) => { if (m.succession_status && SUCCESSION_LABELS[m.succession_status]) { tally[m.succession_status] = (tally[m.succession_status] || 0) + 1; recorded++; } });
+  const scopeName = branchFilter ? (branchNameById[branchFilter] || 'this branch') : 'all branches';
+  const parts = SUCCESSION_ORDER.filter((k) => tally[k]).map((k) =>
+    `<span class="succ-count">${successionBadge(k)}<strong>${tally[k]}</strong></span>`);
+  const unrecorded = inScope.length - recorded;
+  if (unrecorded > 0) parts.push(`<span class="succ-count"><span class="badge succ-none">Not recorded</span><strong>${unrecorded}</strong></span>`);
+  document.getElementById('succession-summary').innerHTML = inScope.length
+    ? `<span class="succession-summary-label">Succession in ${escapeHtml(scopeName)} (${inScope.length} registered)</span>${parts.join('')}`
+    : '';
 
   document.getElementById('directory-count').textContent =
     `Showing ${members.length} of ${allMembers.length} registered whānau. Only your name, branch, join date and succession status are visible to others. Nothing else from your profile is shared here.`;
